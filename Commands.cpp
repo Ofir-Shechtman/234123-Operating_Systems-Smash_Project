@@ -67,7 +67,7 @@ bool _isBackgroundComamnd(const char* cmd_line) {
 void _removeBackgroundSign(char* cmd_line) {
   const string str(cmd_line);
   // find last character other than spaces
-  unsigned int idx = str.find_last_not_of(WHITESPACE);
+    std::string::size_type idx = str.find_last_not_of(WHITESPACE);
   // if all characters are spaces then return
   if (idx == string::npos) {
     return;
