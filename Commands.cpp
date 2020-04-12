@@ -59,6 +59,24 @@ int _parseCommandLine(const char* cmd_line, char** args) {
   FUNC_EXIT()
 }
 
+
+vector<string> _parseCommandLine(const char* cmd_line){
+    FUNC_ENTRY()
+
+    vector<string> args(COMMAND_MAX_ARGS);
+    int i = 0;
+    std::istringstream iss(_trim(string(cmd_line)).c_str());
+    for(std::string s; iss >> s;) {
+        args[i] = s;
+        cout << "@" << args[i] << "@" << endl;
+    }
+    return args;
+
+    FUNC_EXIT()
+}
+
+
+
 bool _isBackgroundComamnd(const char* cmd_line) {
   const string str(cmd_line);
   return str[str.find_last_not_of(WHITESPACE)] == '&';
@@ -84,37 +102,89 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h 
 
-SmallShell::SmallShell() {
+SmallShell::SmallShell() : prompt("smash"){
 // TODO: add your implementation
 }
 
-SmallShell::~SmallShell() {
-// TODO: add your implementation
-}
+SmallShell::~SmallShell() {}
 
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
-/*
+  auto args=_parseCommandLine(cmd_line);
   string cmd_s = string(cmd_line);
   if (cmd_s.find("pwd") == 0) {
     return new GetCurrDirCommand(cmd_line);
   }
-  else if ...
-  .....
+  else if(cmd_s.find("quit") == 0) {
+      return new QuitCommand(cmd_line);
+  }
   else {
     return new ExternalCommand(cmd_line);
   }
-  */
-  return nullptr;
+
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
-  // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
-  // Please note that you must fork smash process for some commands (e.g., external commands....)
+   Command* cmd = CreateCommand(cmd_line);
+   try {
+       cmd->execute();
+       delete cmd;
+   }
+   catch(Command::Quit& quit) {
+       delete cmd;
+       throw quit;
+   }
+   //Please note that you must fork smash process for some commands (e.g., external commands....)
+}
+
+string SmallShell::get_prompt() const {
+    return prompt;
+}
+
+void SmallShell::set_prompt(string input_prompt) {
+    prompt=input_prompt;
+
+}
+
+Command::Command(const char *cmd_line) : cmd_line(cmd_line){
+
+}
+
+BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
+
+}
+
+
+GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line) : BuiltInCommand(
+        cmd_line) {
+
+}
+
+void GetCurrDirCommand::execute() {
+    auto pwd=get_current_dir_name();
+    cout<< pwd << endl;
+    free(pwd);
+
+}
+
+ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
+
+}
+
+void ExternalCommand::execute() {
+    if(string(cmd_line).empty())
+        return;
+
+}
+
+QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),to_kill(jobs){
+
+}
+
+void QuitCommand::execute() {
+    throw Quit();
 }

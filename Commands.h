@@ -2,31 +2,34 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
-
+using std::string;
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
 class Command {
 // TODO: Add your data members
+protected:
+  const char* cmd_line;
  public:
-  Command(const char* cmd_line);
-  virtual ~Command();
+  explicit Command(const char* cmd_line);
+  virtual ~Command() {};
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
+  class Quit : public std::exception{};
 };
 
 class BuiltInCommand : public Command {
  public:
-  BuiltInCommand(const char* cmd_line);
+  explicit BuiltInCommand(const char* cmd_line);
   virtual ~BuiltInCommand() {}
 };
 
 class ExternalCommand : public Command {
  public:
-  ExternalCommand(const char* cmd_line);
+  explicit ExternalCommand(const char* cmd_line);
   virtual ~ExternalCommand() {}
   void execute() override;
 };
@@ -58,8 +61,8 @@ class ChangeDirCommand : public BuiltInCommand {
 
 class GetCurrDirCommand : public BuiltInCommand {
  public:
-  GetCurrDirCommand(const char* cmd_line);
-  virtual ~GetCurrDirCommand() {}
+  explicit GetCurrDirCommand(const char* cmd_line);
+  ~GetCurrDirCommand() override = default;
   void execute() override;
 };
 
@@ -72,8 +75,10 @@ class ShowPidCommand : public BuiltInCommand {
 
 class JobsList;
 class QuitCommand : public BuiltInCommand {
-// TODO: Add your data members public:
-  QuitCommand(const char* cmd_line, JobsList* jobs);
+    // TODO: Add your data members
+public:
+  JobsList* to_kill;
+  QuitCommand(const char* cmd_line, JobsList* jobs= nullptr);
   virtual ~QuitCommand() {}
   void execute() override;
 };
@@ -130,7 +135,7 @@ class JobsCommand : public BuiltInCommand {
 class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  KillCommand(const char* cmd_line, JobsList* jobs);
+  KillCommand(const char* cmd_line);
   virtual ~KillCommand() {}
   void execute() override;
 };
@@ -166,6 +171,7 @@ class CopyCommand : public BuiltInCommand {
 class SmallShell {
  private:
   // TODO: Add your data members
+  string prompt;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
@@ -179,6 +185,8 @@ class SmallShell {
   }
   ~SmallShell();
   void executeCommand(const char* cmd_line);
+  string get_prompt() const;
+  void set_prompt(string input_prompt);
   // TODO: add extra methods as needed
 };
 

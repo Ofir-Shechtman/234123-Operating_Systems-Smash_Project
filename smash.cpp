@@ -4,8 +4,11 @@
 #include <signal.h>
 #include "Commands.h"
 #include "signals.h"
+#include <fstream>
+
 
 int main(int argc, char* argv[]) {
+    setbuf(stdout,0);
     if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
         perror("smash error: failed to set ctrl-Z handler");
     }
@@ -15,12 +18,18 @@ int main(int argc, char* argv[]) {
 
     //TODO: setup sig alarm handler
 
+
     SmallShell& smash = SmallShell::getInstance();
     while(true) {
-        std::cout << "smash> "; // TODO: change this (why?)
+        std::cout << smash.get_prompt() <<"> ";
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
-        smash.executeCommand(cmd_line.c_str());
+        try {
+            smash.executeCommand(cmd_line.c_str());
+        }
+        catch(Command::Quit&){
+            break;
+        }
     }
     return 0;
 }
