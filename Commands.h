@@ -2,6 +2,7 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
+#include <ctime>
 using std::string;
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
@@ -10,7 +11,8 @@ using std::string;
 class Command {
 // TODO: Add your data members
 protected:
-  const char* cmd_line;
+  const string cmd_line;
+  pid_t pid;
  public:
   explicit Command(const char* cmd_line);
   virtual ~Command() {};
@@ -18,7 +20,10 @@ protected:
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
-  class Quit : public std::exception{};
+  string getCommand() const;
+  pid_t get_pid() const;
+  void set_pid(pid_t pid);
+    class Quit : public std::exception{};
 };
 
 class BuiltInCommand : public Command {
@@ -105,27 +110,38 @@ class HistoryCommand : public BuiltInCommand {
 };
 
 class JobsList {
- public:
-  class JobEntry {
-   // TODO: Add your data members
+    typedef unsigned int JobId;
+    class JobEntry {
+      public:
+        Command* cmd;
+        JobId job_id;
+        time_t time_in;
+        bool isStopped;
+        JobEntry(Command* cmd, JobId job_id, bool isStopped);
+        ~JobEntry()= default;
+        //JobEntry(JobEntry&)= delete;
+        friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
   };
- // TODO: Add your data members
- public:
-  JobsList();
-  ~JobsList();
+  std::vector<JobEntry> list;
+public:
+  JobsList()= default;
+  ~JobsList()= default;
   void addJob(Command* cmd, bool isStopped = false);
-  void printJobsList();
+  void printJobsList() const;
   void killAllJobs();
   void removeFinishedJobs();
-  JobEntry * getJobById(int jobId);
-  void removeJobById(int jobId);
-  JobEntry * getLastJob(int* lastJobId);
-  JobEntry *getLastStoppedJob(int *jobId);
-  // TODO: Add extra methods or modify exisitng ones as needed
+  JobEntry * getJobById(JobId);
+  void removeJobById(JobId);
+  JobEntry * getLastJob(JobId* lastJobId);
+  JobEntry *getLastStoppedJob(JobId* jobId);
+  JobId allocJobId() const;
+  friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
+
 };
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
+ JobsList* jobs;
  public:
   JobsCommand(const char* cmd_line, JobsList* jobs);
   virtual ~JobsCommand() {}
@@ -169,11 +185,12 @@ class CopyCommand : public BuiltInCommand {
 // maybe chprompt , timeout ?
 
 class SmallShell {
- private:
+public:
   // TODO: Add your data members
   string prompt;
+  JobsList jobs_list;
   SmallShell();
- public:
+ //public:
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator

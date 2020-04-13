@@ -68,7 +68,8 @@ vector<string> _parseCommandLine(const char* cmd_line){
     std::istringstream iss(_trim(string(cmd_line)).c_str());
     for(std::string s; iss >> s;) {
         args[i] = s;
-        cout << "@" << args[i] << "@" << endl;
+        //cout << "@" << args[i] << "@" << endl;
+        ++i;
     }
     return args;
 
@@ -114,12 +115,16 @@ SmallShell::~SmallShell() {}
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
   auto args=_parseCommandLine(cmd_line);
+  SmallShell& smash= SmallShell::getInstance();
   string cmd_s = string(cmd_line);
   if (cmd_s.find("pwd") == 0) {
     return new GetCurrDirCommand(cmd_line);
   }
   else if(cmd_s.find("quit") == 0) {
       return new QuitCommand(cmd_line);
+  }
+  else if(cmd_s.find("jobs") == 0) {
+      return new JobsCommand(cmd_line, &smash.jobs_list);
   }
   else {
     return new ExternalCommand(cmd_line);
@@ -129,9 +134,24 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
-   Command* cmd = CreateCommand(cmd_line);
+  bool bg_sign=_isBackgroundComamnd(cmd_line);
+  char * cmd_line_no_bgsign = (char*)malloc(strlen(cmd_line) + 1);
+  strcpy(cmd_line_no_bgsign, cmd_line);
+  _removeBackgroundSign(cmd_line_no_bgsign);
+  Command* cmd = CreateCommand(cmd_line_no_bgsign);
    try {
-       cmd->execute();
+       pid_t child_pid = fork();
+       if(child_pid==0) {
+           cmd->execute();
+       }
+       else{
+           cmd->set_pid(child_pid);
+           if(bg_sign)
+               jobs_list.addJob(cmd, false);
+           else
+                waitpid(child_pid, NULL, 0);
+       }
+
        delete cmd;
    }
    catch(Command::Quit& quit) {
@@ -150,8 +170,20 @@ void SmallShell::set_prompt(string input_prompt) {
 
 }
 
-Command::Command(const char *cmd_line) : cmd_line(cmd_line){
+Command::Command(const char *cmd_line) : cmd_line(cmd_line), pid(-1){
 
+}
+
+string Command::getCommand() const {
+    return _parseCommandLine(cmd_line.c_str())[0];
+}
+
+pid_t Command::get_pid() const {
+    return pid;
+}
+
+void Command::set_pid(pid_t pid_in) {
+    pid=pid_in;
 }
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
@@ -168,7 +200,6 @@ void GetCurrDirCommand::execute() {
     auto pwd=get_current_dir_name();
     cout<< pwd << endl;
     free(pwd);
-
 }
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
@@ -176,9 +207,12 @@ ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
 }
 
 void ExternalCommand::execute() {
-    if(string(cmd_line).empty())
+    if(cmd_line.empty())
         return;
-
+    char cmd[cmd_line.size()+1];
+    strcpy(cmd,cmd_line.c_str());
+    const char* const argv[4] = {"/bin/bash", "-c", cmd, nullptr};
+    execvp(argv[0], const_cast<char* const*>(argv));
 }
 
 QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),to_kill(jobs){
@@ -187,4 +221,41 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(
 
 void QuitCommand::execute() {
     throw Quit();
+}
+
+JobsList::JobEntry::JobEntry(Command *cmd, JobsList::JobId job_id, bool isStopped) :
+    cmd(cmd), job_id(job_id), time_in(time(NULL)), isStopped(isStopped){
+
+}
+
+std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
+    os << "[" << job.job_id << "]" << " " << job.cmd->getCommand() << " : ";
+    os << job.cmd->get_pid() << " ";
+    os << difftime(time(NULL), job.time_in) << " secs";
+    if(job.isStopped)
+        os << " (stopped)";
+    return os;
+}
+
+void JobsList::addJob(Command *cmd, bool isStopped) {
+    list.emplace_back(cmd, allocJobId(), isStopped);
+}
+
+void JobsList::printJobsList() const{
+    for(auto& job : list){
+        cout << job << endl;
+    }
+
+}
+
+JobsList::JobId JobsList::allocJobId() const {
+    return list.empty() ? 1 : list.back().job_id+1;
+}
+
+JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs):
+    BuiltInCommand(cmd_line), jobs(jobs){}
+
+void JobsCommand::execute() {
+    jobs->printJobsList();
+
 }
