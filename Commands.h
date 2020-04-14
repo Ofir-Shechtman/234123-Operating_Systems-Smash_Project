@@ -3,6 +3,8 @@
 
 #include <vector>
 using std::string;
+using std::cout;
+using std::vector;
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
@@ -52,28 +54,40 @@ class RedirectionCommand : public Command {
   //void cleanup() override;
 };
 
-class ChangeDirCommand : public BuiltInCommand {
-// TODO: Add your data members public:
-  ChangeDirCommand(const char* cmd_line, char** plastPwd);
-  virtual ~ChangeDirCommand() {}
-  void execute() override;
-};
-
-class GetCurrDirCommand : public BuiltInCommand {
- public:
-  explicit GetCurrDirCommand(const char* cmd_line);
-  ~GetCurrDirCommand() override = default;
-  void execute() override;
+class ChangePromptCommand : public BuiltInCommand {
+    string input_prompt;
+public:
+    explicit ChangePromptCommand(const char* cmd_line, vector<string> args);
+    ~ChangePromptCommand() override = default;
+    void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
- public:
-  ShowPidCommand(const char* cmd_line);
-  virtual ~ShowPidCommand() {}
-  void execute() override;
+public:
+    explicit ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){};
+    ~ShowPidCommand() override = default;
+    void execute() override;
 };
 
+class GetCurrDirCommand : public BuiltInCommand {
+public:
+    explicit GetCurrDirCommand(const char* cmd_line): BuiltInCommand(cmd_line){};
+    ~GetCurrDirCommand() override = default;
+    void execute() override;
+};
+
+class ChangeDirCommand : public BuiltInCommand {
+    string next_dir;
+// TODO: Add your data members
+public:
+    explicit ChangeDirCommand(const char* cmd_line, vector<string> args);
+    ~ChangeDirCommand() override//TODO: free dirs
+    void execute() override;
+};
+
+
 class JobsList;
+
 class QuitCommand : public BuiltInCommand {
     // TODO: Add your data members
 public:
@@ -169,9 +183,9 @@ class CopyCommand : public BuiltInCommand {
 // maybe chprompt , timeout ?
 
 class SmallShell {
- private:
   // TODO: Add your data members
   string prompt;
+  string prev_dir;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
@@ -187,6 +201,8 @@ class SmallShell {
   void executeCommand(const char* cmd_line);
   string get_prompt() const;
   void set_prompt(string input_prompt);
+  string get_prev_dir() const;
+  void set_prev_dir(string prev_dir);
   // TODO: add extra methods as needed
 };
 

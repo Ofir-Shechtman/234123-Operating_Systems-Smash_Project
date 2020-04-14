@@ -68,7 +68,8 @@ vector<string> _parseCommandLine(const char* cmd_line){
     std::istringstream iss(_trim(string(cmd_line)).c_str());
     for(std::string s; iss >> s;) {
         args[i] = s;
-        cout << "@" << args[i] << "@" << endl;
+        //cout << "@" << args[i] << "@" << endl;
+        i++;
     }
     return args;
 
@@ -113,10 +114,19 @@ SmallShell::~SmallShell() {}
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
-  auto args=_parseCommandLine(cmd_line);
+  vector<string> args=_parseCommandLine(cmd_line);
   string cmd_s = string(cmd_line);
+  if (cmd_s.find("chprompt") == 0) {
+      return new ChangePromptCommand(cmd_line, args);
+  }
+  if (cmd_s.find("showpid") == 0) {
+      return new ShowPidCommand(cmd_line);
+  }
   if (cmd_s.find("pwd") == 0) {
     return new GetCurrDirCommand(cmd_line);
+  }
+  if (cmd_s.find("cd") == 0) {
+    return new ChangeDirCommand(cmd_line, args);
   }
   else if(cmd_s.find("quit") == 0) {
       return new QuitCommand(cmd_line);
@@ -124,7 +134,6 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   else {
     return new ExternalCommand(cmd_line);
   }
-
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
@@ -132,13 +141,12 @@ void SmallShell::executeCommand(const char *cmd_line) {
    Command* cmd = CreateCommand(cmd_line);
    try {
        cmd->execute();
-       delete cmd;
    }
    catch(Command::Quit& quit) {
        delete cmd;
        throw quit;
    }
-   //Please note that you must fork smash process for some commands (e.g., external commands....)
+   delete cmd;
 }
 
 string SmallShell::get_prompt() const {
@@ -147,7 +155,6 @@ string SmallShell::get_prompt() const {
 
 void SmallShell::set_prompt(string input_prompt) {
     prompt=input_prompt;
-
 }
 
 Command::Command(const char *cmd_line) : cmd_line(cmd_line){
@@ -158,17 +165,10 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
 
 }
 
-
-GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line) : BuiltInCommand(
-        cmd_line) {
-
-}
-
 void GetCurrDirCommand::execute() {
-    auto pwd=get_current_dir_name();
+    char* pwd=get_current_dir_name();
     cout<< pwd << endl;
     free(pwd);
-
 }
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
@@ -187,4 +187,31 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(
 
 void QuitCommand::execute() {
     throw Quit();
+}
+
+ChangePromptCommand::ChangePromptCommand(const char* cmd_line, vector<string> args) : BuiltInCommand(cmd_line) {
+    if(args[1] != "") input_prompt = args[1];
+    else input_prompt = "smash";
+}
+
+void ChangePromptCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    smash.set_prompt(input_prompt);
+}
+
+void ShowPidCommand::execute() {
+    cout<<"smash pid is "<<getpid()<<endl;
+}
+
+ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string> args) : BuiltInCommand(cmd_line){
+    SmallShell& smash = SmallShell::getInstance();
+    if(args[1] == "-") next_dir = smash.get_prev_dir();
+    else next_dir = args[1];
+}
+
+void ChangeDirCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    smash.set_prev_dir(get_current_dir_name());
+
+
 }
