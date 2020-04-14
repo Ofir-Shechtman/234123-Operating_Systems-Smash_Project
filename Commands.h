@@ -88,7 +88,9 @@ class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members
 public:
     explicit ChangeDirCommand(const char* cmd_line, vector<string> args);
-    ~ChangeDirCommand() override;//TODO: free dirs
+    class TooManyArgs : public std::exception{};
+    class NoOldPWD : public std::exception{};
+    ~ChangeDirCommand() override = default;//TODO: free dirs
     void execute() override;
 };
 
@@ -205,6 +207,7 @@ public:
   // TODO: Add your data members
   string prompt;
   JobsList jobs_list;
+  string prev_dir;
   pid_t pid;
   SmallShell();
  //public:
@@ -220,9 +223,10 @@ public:
   ~SmallShell();
   void executeCommand(const char* cmd_line);
   string get_prompt() const;
+  pid_t get_pid();
   void set_prompt(string input_prompt);
   string get_prev_dir() const;
-  void set_prev_dir(string prev_dir);
+  void set_prev_dir(string new_dir);
   // TODO: add extra methods as needed
 };
 

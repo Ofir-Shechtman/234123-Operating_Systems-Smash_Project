@@ -1,10 +1,13 @@
 #include <unistd.h>
 #include <string.h>
+#include <stdio.h>
 #include <iostream>
+#include <utility>
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
+#include <unistd.h>
 #include "Commands.h"
 
 using namespace std;
@@ -103,7 +106,7 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h 
 
-SmallShell::SmallShell() : prompt("smash"){
+SmallShell::SmallShell() : prompt("smash"), pid(getpid()), prev_dir(""){
 // TODO: add your implementation
 }
 
@@ -113,63 +116,68 @@ SmallShell::~SmallShell() {}
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
-	// For example:
-	//s
-  vector<string> args=_parseCommandLine(cmd_line);
-  string cmd_s = string(cmd_line);
-  SmallShell& smash= SmallShell::getInstance();
-  if (cmd_s.find("chprompt") == 0) {
-      return new ChangePromptCommand(cmd_line, args);
-  }
-  else if (cmd_s.find("showpid") == 0) {
-      return new ShowPidCommand(cmd_line);
-  }
- // else if (cmd_s.find("pwd") == 0) {
- //   return new GetCurrDirCommand(cmd_line);
-//  }
- // else if (cmd_s.find("cd") == 0) {
- //   return new ChangeDirCommand(cmd_line, args);
- // }
-  else if(cmd_s.find("quit") == 0) {
-      return new QuitCommand(cmd_line);
-  }
-  else if(cmd_s.find("jobs") == 0) {
-      return new JobsCommand(cmd_line, &smash.jobs_list);
-  }
-  else {
-    return new ExternalCommand(cmd_line);
-  }
+      vector<string> args=_parseCommandLine(cmd_line);
+      string cmd_s = string(cmd_line);
+      SmallShell& smash= SmallShell::getInstance();
+      if (cmd_s.find("chprompt") == 0) {
+          return new ChangePromptCommand(cmd_line, args);
+      }
+      else if (cmd_s.find("showpid") == 0) {
+          return new ShowPidCommand(cmd_line);
+      }
+      else if (cmd_s.find("pwd") == 0) {
+        return new GetCurrDirCommand(cmd_line);
+      }
+      else if (cmd_s.find("cd") == 0) {
+        return new ChangeDirCommand(cmd_line, args);
+      }
 
-}
+      else if(cmd_s.find("quit") == 0) {
+          return new QuitCommand(cmd_line);
+      }
+      else if(cmd_s.find("jobs") == 0) {
+          return new JobsCommand(cmd_line, &smash.jobs_list);
+      }
+      else {
+        return new ExternalCommand(cmd_line);
+      }
+
+    }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-  // TODO: Add your implementation here
-  bool bg_sign=_isBackgroundComamnd(cmd_line);
-  char * cmd_line_no_bgsign = (char*)malloc(strlen(cmd_line) + 1);
-  strcpy(cmd_line_no_bgsign, cmd_line);
-  _removeBackgroundSign(cmd_line_no_bgsign);
-  Command* cmd = CreateCommand(cmd_line_no_bgsign);
-   try {
-       pid_t child_pid = fork();
-       if(child_pid==0) {
-           cmd->execute();
-       }
-       else{
-           cmd->set_pid(child_pid);
-           if(bg_sign)
-               jobs_list.addJob(cmd, false);
-           else {
-               waitpid(child_pid, NULL, 0);
-               delete cmd;
-           }
-
-       }
-   }
-   catch(Command::Quit& quit) {
-       delete cmd;
-       throw quit;
-   }
-   //Please note that you must fork smash process for some commands (e.g., external commands....)
+    bool bg_sign=_isBackgroundComamnd(cmd_line);
+    char * cmd_line_no_bgsign = (char*)malloc(strlen(cmd_line) + 1);
+    strcpy(cmd_line_no_bgsign, cmd_line);
+    _removeBackgroundSign(cmd_line_no_bgsign);
+    Command* cmd = nullptr;
+    try {
+        cmd = CreateCommand(cmd_line_no_bgsign);
+        pid_t child_pid = fork();
+        if(child_pid==0) {
+            cmd->execute();
+        }
+        else{
+            cmd->set_pid(child_pid);
+            if(bg_sign)
+                jobs_list.addJob(cmd, false);
+            else {
+                waitpid(child_pid, NULL, 0);
+                delete cmd;
+            }
+        }
+    }
+    catch(ChangeDirCommand::TooManyArgs& tma){
+        cout<<"smash error: cd: too many arguments"<<endl;
+        delete cmd;
+    }
+    catch(ChangeDirCommand::NoOldPWD& nop){
+        cout<<"smash error: cd: OLDPWD not set"<<endl;
+        delete cmd;
+    }
+    catch(Command::Quit& quit) {
+        delete cmd;
+        throw quit;
+    }//Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
 string SmallShell::get_prompt() const {
@@ -177,8 +185,20 @@ string SmallShell::get_prompt() const {
 }
 
 void SmallShell::set_prompt(string input_prompt) {
-    prompt=input_prompt;
+    prompt=std::move(input_prompt);
 
+}
+
+string SmallShell::get_prev_dir() const {
+    return prev_dir;
+}
+
+void SmallShell::set_prev_dir(string new_dir) {
+    prev_dir = std::move(new_dir);
+}
+
+pid_t SmallShell::get_pid() {
+    return pid;
 }
 
 Command::Command(const char *cmd_line) : cmd_line(cmd_line), pid(-1){
@@ -277,7 +297,7 @@ void JobsCommand::execute() {
 }
 
 ChangePromptCommand::ChangePromptCommand(const char* cmd_line, vector<string> args) : BuiltInCommand(cmd_line) {
-    if(args[1] != "") input_prompt = args[1];
+    if(args.size()>1) input_prompt = args[1];
     else input_prompt = "smash";
 }
 
@@ -287,18 +307,25 @@ void ChangePromptCommand::execute() {
 }
 
 void ShowPidCommand::execute() {
-    cout<<"smash pid is "<<getpid()<<endl;
+    SmallShell& smash = SmallShell::getInstance();
+    cout<<"smash pid is "<<smash.get_pid()<<endl;
 }
 
-//ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string> args) : BuiltInCommand(cmd_line){
-    //SmallShell& smash = SmallShell::getInstance();
-    //if(args[1] == "-") next_dir = smash.get_prev_dir();
-    //else next_dir = args[1];
-//}
+ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string> args) : BuiltInCommand(cmd_line){
+    SmallShell& smash = SmallShell::getInstance();
+    if(args.size()>2) throw TooManyArgs();
+    if(args[1] == "-") {
+        next_dir = smash.get_prev_dir();
+        if(next_dir.empty()) throw NoOldPWD();
+    }
+    else next_dir =  args[1];
+}
 
-//void ChangeDirCommand::execute() {
-    //SmallShell& smash = SmallShell::getInstance();
-    //smash.set_prev_dir(get_current_dir_name());
-
-
-//}
+void ChangeDirCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    string prev_dir = get_current_dir_name();
+    if(chdir(next_dir.c_str()) == -1){
+        perror("smash error: chdir failed");
+    }
+    else smash.set_prev_dir(prev_dir);
+}
