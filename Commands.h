@@ -26,6 +26,7 @@ protected:
   //bool isFinish() const;
   //void Kill() const;
   string getCommand() const;
+  string get_cmd_line() const;
   //pid_t get_pid() const;
   //void set_pid(pid_t pid);
     class Quit : public std::exception{};
@@ -129,7 +130,9 @@ class HistoryCommand : public BuiltInCommand {
 };
 
 class JobsList {
+public:
     typedef unsigned int JobId;
+private:
     class JobEntry {
       public:
         Command* cmd;
@@ -148,7 +151,7 @@ class JobsList {
   JobId allocJobId() const;
 public:
   JobsList()= default;
-  ~JobsList()= default;
+  ~JobsList();
   void addJob(Command* cmd, pid_t pid, bool isStopped = false);
   void printJobsList() const;
   void killAllJobs();
@@ -157,6 +160,7 @@ public:
   void removeJobById(JobId);
   JobEntry * getLastJob(JobId* lastJobId);
   JobEntry *getLastStoppedJob(JobId* jobId);
+  bool empty() const;
   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
 
 };
@@ -179,19 +183,20 @@ class KillCommand : public BuiltInCommand {
 };
 
 class ForegroundCommand : public BuiltInCommand {
- // TODO: Add your data members
+    JobsList* jobs;
+    vector<string> args;
  public:
-  ForegroundCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~ForegroundCommand() {}
-  void execute() override;
+    ForegroundCommand(const char* cmd_line, JobsList* jobs, vector<string> args);
+    virtual ~ForegroundCommand()= default;
+    void execute() override;
 };
 
 class BackgroundCommand : public BuiltInCommand {
- // TODO: Add your data members
+    JobsList* jobs;
  public:
-  BackgroundCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~BackgroundCommand() {}
-  void execute() override;
+    BackgroundCommand(const char* cmd_line, JobsList* jobs);
+    virtual ~BackgroundCommand() {}
+    void execute() override;
 };
 
 

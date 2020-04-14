@@ -132,12 +132,14 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       else if (cmd_s.find("cd") == 0) {
         return new ChangeDirCommand(cmd_line, args);
       }
-
       else if(cmd_s.find("quit") == 0) {
           return new QuitCommand(cmd_line);
       }
       else if(cmd_s.find("jobs") == 0) {
           return new JobsCommand(cmd_line, &smash.jobs_list);
+      }
+      else if(cmd_s.find("fg") == 0) {
+          return new ForegroundCommand(cmd_line, &smash.jobs_list, args);
       }
       else {
         return new ExternalCommand(cmd_line);
@@ -147,13 +149,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
-   char * cmd_line_no_bgsign = (char*)malloc(strlen(cmd_line) + 1);
-   strcpy(cmd_line_no_bgsign, cmd_line);
-   _removeBackgroundSign(cmd_line_no_bgsign);
-  Command* cmd= nullptr;
+   Command* cmd= nullptr;
    try {
-        cmd = CreateCommand(cmd_line_no_bgsign);
-        free(cmd_line_no_bgsign);
+        cmd = CreateCommand(cmd_line);
         cmd->bg=_isBackgroundComamnd(cmd_line);
         cmd->execute();
         if(!cmd->bg)
@@ -202,27 +200,10 @@ Command::Command(const char *cmd_line) : cmd_line(cmd_line){
 string Command::getCommand() const {
     return _parseCommandLine(cmd_line.c_str())[0];
 }
-/*
-pid_t Command::get_pid() const {
-    cout<<"get_pid: "<<pid<<endl;
-    return pid;
+
+string Command::get_cmd_line() const {
+    return cmd_line;
 }
-
-void Command::set_pid(pid_t pid_in) {
-    cout<<"set_pid: "<<pid_in<<endl;
-    pid=pid_in;
-}*/
-/*
-void Command::Kill() const {
-    kill(pid, 9);
-    cout<<"signal number 9 was sent to pid " << pid << endl;
-}
-
-bool Command::isFinish() const {
-    cout<<"waitpid( "<<pid<<" ) = "<<waitpid(pid, nullptr ,WNOHANG)<<endl;
-    return !waitpid(pid, nullptr ,WNOHANG);;
-}*/
-
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
 
@@ -244,6 +225,7 @@ void ExternalCommand::execute() {
      SmallShell& smash= SmallShell::getInstance();
      char cmd[cmd_line.size()+1];
      strcpy(cmd,cmd_line.c_str());
+     _removeBackgroundSign(cmd);
      const char* const argv[4] = {"/bin/bash", "-c", cmd, nullptr};
      pid_t child_pid= fork();
      if(child_pid==0) {
@@ -316,6 +298,7 @@ JobsList::JobId JobsList::allocJobId() const {
 }
 
 void JobsList::killAllJobs() {
+    removeFinishedJobs();
     for(auto& job : list){
         job.Kill();
     }
@@ -338,17 +321,37 @@ JobsList::JobEntry *JobsList::getJobById(JobsList::JobId job_id_in) {
     return nullptr;
 }
 
-JobsList::JobEntry *JobsList::getLastJob(JobsList::JobId *lastJobId) {
-    return &list.front();
+JobsList::JobEntry *JobsList::getLastJob(JobsList::JobId* lastJobId) {
+    removeFinishedJobs();
+    if (!lastJobId)
+        return &list.front();
+    for (auto &job : list) {
+        if (job.job_id == *lastJobId)
+            return &job;
+    }
+    return nullptr;
 }
 
-JobsList::JobEntry *JobsList::getLastStoppedJob(JobsList::JobId *jobId) {
+JobsList::JobEntry *JobsList::getLastStoppedJob(JobsList::JobId* jobId) {
+    removeFinishedJobs();
     JobEntry* last_job = nullptr;
     for(auto& job : list){
+        if(job.job_id==*jobId)
+            return &job;
         if(job.isStopped)
             last_job=&job;
     }
     return last_job;
+}
+
+JobsList::~JobsList() {
+    for(auto j: list)
+        delete j.cmd;
+
+}
+
+bool JobsList::empty() const {
+    return list.empty();
 }
 
 
@@ -394,3 +397,38 @@ void ChangeDirCommand::execute() {
     }
     else smash.set_prev_dir(prev_dir);
 }
+
+ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs, vector<string> args) :
+        BuiltInCommand(cmd_line), jobs(jobs), args(args){}
+
+void ForegroundCommand::execute() {
+    if(jobs->empty()) {
+        cout << "smash error: fg: job list is empty" << endl;
+        return;
+    }
+    JobsList::JobId* job_id = nullptr;
+    bool valid_job_id = true;
+    try {
+        if(args.size()>1) {
+            JobsList::JobId id = stoi(args[1]);
+            job_id = &id;
+        }
+    }
+    catch(std::invalid_argument const &e) {
+        valid_job_id = false;
+    }
+    if(args.size()>2 || !valid_job_id){
+        cout<<"smash error: fg: invalid arguments"<<endl;
+        return;
+    }
+    auto job= jobs->getLastJob(job_id);
+    if(!job) {
+        cout << "smash error: fg: job-id " << *job_id << " does not exist"
+             << endl;
+        return;
+    }
+    kill(job->pid,SIGCONT);
+    cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
+    waitpid(job->pid, NULL, 0);
+}
+
