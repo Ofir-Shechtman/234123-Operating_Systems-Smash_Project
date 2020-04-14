@@ -17,11 +17,13 @@ protected:
   pid_t pid;
  public:
   explicit Command(const char* cmd_line);
-  virtual ~Command() {};
+  virtual ~Command()= default;;
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
+  bool isFinish() const;
+  void Kill() const;
   string getCommand() const;
   pid_t get_pid() const;
   void set_pid(pid_t pid);
@@ -203,6 +205,7 @@ public:
   // TODO: Add your data members
   string prompt;
   JobsList jobs_list;
+  pid_t pid;
   SmallShell();
  //public:
   Command *CreateCommand(const char* cmd_line);

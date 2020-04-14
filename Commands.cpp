@@ -63,13 +63,13 @@ int _parseCommandLine(const char* cmd_line, char** args) {
 vector<string> _parseCommandLine(const char* cmd_line){
     FUNC_ENTRY()
 
-    vector<string> args(COMMAND_MAX_ARGS);
-    int i = 0;
+    vector<string> args;//COMMAND_MAX_ARGS
+    //int i = 0;
     std::istringstream iss(_trim(string(cmd_line)).c_str());
     for(std::string s; iss >> s;) {
-        args[i] = s;
+        args.push_back(s);
         //cout << "@" << args[i] << "@" << endl;
-        ++i;
+        //++i;
     }
     return args;
 
@@ -158,11 +158,12 @@ void SmallShell::executeCommand(const char *cmd_line) {
            cmd->set_pid(child_pid);
            if(bg_sign)
                jobs_list.addJob(cmd, false);
-           else
-                waitpid(child_pid, NULL, 0);
-       }
+           else {
+               waitpid(child_pid, NULL, 0);
+               delete cmd;
+           }
 
-       delete cmd;
+       }
    }
    catch(Command::Quit& quit) {
        delete cmd;
@@ -195,6 +196,17 @@ pid_t Command::get_pid() const {
 void Command::set_pid(pid_t pid_in) {
     pid=pid_in;
 }
+
+void Command::Kill() const {
+    kill(pid, 9);
+    cout<<"signal number 9 was sent to pid " << pid << endl;
+}
+
+bool Command::isFinish() const {
+    waitpid(pid, NULL ,WNOHANG);
+    return false;
+}
+
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
 
