@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include <unistd.h>
+#include <algorithm>
 #include "Commands.h"
 
 using namespace std;
@@ -142,42 +143,35 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new ExternalCommand(cmd_line);
       }
 
-    }
+}
 
 void SmallShell::executeCommand(const char *cmd_line) {
-    bool bg_sign=_isBackgroundComamnd(cmd_line);
-    char * cmd_line_no_bgsign = (char*)malloc(strlen(cmd_line) + 1);
-    strcpy(cmd_line_no_bgsign, cmd_line);
-    _removeBackgroundSign(cmd_line_no_bgsign);
-    Command* cmd = nullptr;
-    try {
+  // TODO: Add your implementation here
+   char * cmd_line_no_bgsign = (char*)malloc(strlen(cmd_line) + 1);
+   strcpy(cmd_line_no_bgsign, cmd_line);
+   _removeBackgroundSign(cmd_line_no_bgsign);
+  Command* cmd= nullptr;
+   try {
         cmd = CreateCommand(cmd_line_no_bgsign);
-        pid_t child_pid = fork();
-        if(child_pid==0) {
-            cmd->execute();
-        }
-        else{
-            cmd->set_pid(child_pid);
-            if(bg_sign)
-                jobs_list.addJob(cmd, false);
-            else {
-                waitpid(child_pid, NULL, 0);
-                delete cmd;
-            }
-        }
-    }
-    catch(ChangeDirCommand::TooManyArgs& tma){
-        cout<<"smash error: cd: too many arguments"<<endl;
-        delete cmd;
-    }
-    catch(ChangeDirCommand::NoOldPWD& nop){
-        cout<<"smash error: cd: OLDPWD not set"<<endl;
-        delete cmd;
-    }
-    catch(Command::Quit& quit) {
-        delete cmd;
-        throw quit;
-    }//Please note that you must fork smash process for some commands (e.g., external commands....)
+        free(cmd_line_no_bgsign);
+        cmd->bg=_isBackgroundComamnd(cmd_line);
+        cmd->execute();
+        if(!cmd->bg)
+            delete cmd;
+   }
+   catch(ChangeDirCommand::TooManyArgs& tma){
+       cout<<"smash error: cd: too many arguments"<<endl;
+       delete cmd;
+   }
+   catch(ChangeDirCommand::NoOldPWD& nop){
+       cout<<"smash error: cd: OLDPWD not set"<<endl;
+       delete cmd;
+   }
+   catch(Command::Quit& quit) {
+       delete cmd;
+       throw quit;
+   }
+   //Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
 string SmallShell::get_prompt() const {
@@ -201,31 +195,33 @@ pid_t SmallShell::get_pid() {
     return pid;
 }
 
-Command::Command(const char *cmd_line) : cmd_line(cmd_line), pid(-1){
+Command::Command(const char *cmd_line) : cmd_line(cmd_line){
 
 }
 
 string Command::getCommand() const {
     return _parseCommandLine(cmd_line.c_str())[0];
 }
-
+/*
 pid_t Command::get_pid() const {
+    cout<<"get_pid: "<<pid<<endl;
     return pid;
 }
 
 void Command::set_pid(pid_t pid_in) {
+    cout<<"set_pid: "<<pid_in<<endl;
     pid=pid_in;
-}
-
+}*/
+/*
 void Command::Kill() const {
     kill(pid, 9);
     cout<<"signal number 9 was sent to pid " << pid << endl;
 }
 
 bool Command::isFinish() const {
-    waitpid(pid, NULL ,WNOHANG);
-    return false;
-}
+    cout<<"waitpid( "<<pid<<" ) = "<<waitpid(pid, nullptr ,WNOHANG)<<endl;
+    return !waitpid(pid, nullptr ,WNOHANG);;
+}*/
 
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
@@ -243,13 +239,28 @@ ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
 }
 
 void ExternalCommand::execute() {
-    if(cmd_line.empty())
+     if(cmd_line.empty())
         return;
-    char cmd[cmd_line.size()+1];
-    strcpy(cmd,cmd_line.c_str());
-    const char* const argv[4] = {"/bin/bash", "-c", cmd, nullptr};
-    execvp(argv[0], const_cast<char* const*>(argv));
+     SmallShell& smash= SmallShell::getInstance();
+     char cmd[cmd_line.size()+1];
+     strcpy(cmd,cmd_line.c_str());
+     const char* const argv[4] = {"/bin/bash", "-c", cmd, nullptr};
+     pid_t child_pid= fork();
+     if(child_pid==0) {
+            setpgrp();
+            execvp(argv[0], const_cast<char* const*>(argv));
+
+
+     }
+     else{
+         if(bg)
+             smash.jobs_list.addJob(this, child_pid);
+         else{
+             waitpid(child_pid, NULL, 0);
+         }
+     }
 }
+
 
 QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),to_kill(jobs){
 
@@ -259,22 +270,38 @@ void QuitCommand::execute() {
     throw Quit();
 }
 
-JobsList::JobEntry::JobEntry(Command *cmd, JobsList::JobId job_id, bool isStopped) :
-    cmd(cmd), job_id(job_id), time_in(time(NULL)), isStopped(isStopped){
+JobsList::JobEntry::JobEntry(Command *cmd, pid_t pid_in, JobsList::JobId job_id, bool isStopped) :
+    cmd(cmd), pid(pid_in), job_id(job_id), time_in(time(NULL)), isStopped(isStopped){
 
 }
 
 std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
     os << "[" << job.job_id << "]" << " " << job.cmd->getCommand() << " : ";
-    os << job.cmd->get_pid() << " ";
+    os << job.pid << " ";
     os << difftime(time(NULL), job.time_in) << " secs";
     if(job.isStopped)
         os << " (stopped)";
     return os;
 }
 
-void JobsList::addJob(Command *cmd, bool isStopped) {
-    list.emplace_back(cmd, allocJobId(), isStopped);
+void JobsList::JobEntry::Kill() {
+    kill(pid, 9);
+    cout<<"signal number 9 was sent to pid " << pid << endl;
+    delete cmd;
+    cmd= nullptr;
+}
+
+
+bool JobsList::JobEntry::finish() const {
+    //cout<<"waitpid("<<pid<<") = "<<waitpid(pid, nullptr ,WNOHANG)<<endl;
+    return waitpid(pid, nullptr ,WNOHANG)==-1;;
+}
+
+void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
+    //cout<<"printJobsList:"<<endl;
+    //printJobsList();
+    //removeFinishedJobs();
+    list.emplace_back(JobEntry(cmd, pid,allocJobId(), isStopped));
 }
 
 void JobsList::printJobsList() const{
@@ -288,10 +315,48 @@ JobsList::JobId JobsList::allocJobId() const {
     return list.empty() ? 1 : list.back().job_id+1;
 }
 
+void JobsList::killAllJobs() {
+    for(auto& job : list){
+        job.Kill();
+    }
+}
+
+void JobsList::removeFinishedJobs() {
+    for(auto job=list.begin(); job!=list.end();){
+        if((*job).finish()) {
+            list.erase(job);
+        } else
+            ++job;
+    }
+}
+
+JobsList::JobEntry *JobsList::getJobById(JobsList::JobId job_id_in) {
+    for(auto& job : list){
+        if(job.job_id==job_id_in)
+            return &job;
+    }
+    return nullptr;
+}
+
+JobsList::JobEntry *JobsList::getLastJob(JobsList::JobId *lastJobId) {
+    return &list.front();
+}
+
+JobsList::JobEntry *JobsList::getLastStoppedJob(JobsList::JobId *jobId) {
+    JobEntry* last_job = nullptr;
+    for(auto& job : list){
+        if(job.isStopped)
+            last_job=&job;
+    }
+    return last_job;
+}
+
+
 JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs):
     BuiltInCommand(cmd_line), jobs(jobs){}
 
 void JobsCommand::execute() {
+    jobs->removeFinishedJobs();
     jobs->printJobsList();
 
 }

@@ -14,19 +14,20 @@ class Command {
 // TODO: Add your data members
 protected:
   const string cmd_line;
-  pid_t pid;
+  //pid_t pid;
  public:
+  bool bg;
   explicit Command(const char* cmd_line);
   virtual ~Command()= default;;
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
-  bool isFinish() const;
-  void Kill() const;
+  //bool isFinish() const;
+  //void Kill() const;
   string getCommand() const;
-  pid_t get_pid() const;
-  void set_pid(pid_t pid);
+  //pid_t get_pid() const;
+  //void set_pid(pid_t pid);
     class Quit : public std::exception{};
 };
 
@@ -132,19 +133,23 @@ class JobsList {
     class JobEntry {
       public:
         Command* cmd;
+        pid_t pid;
         JobId job_id;
         time_t time_in;
         bool isStopped;
-        JobEntry(Command* cmd, JobId job_id, bool isStopped);
+        JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped);
+        void Kill();
+        bool finish() const;
         ~JobEntry()= default;
         //JobEntry(JobEntry&)= delete;
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
   };
   std::vector<JobEntry> list;
+  JobId allocJobId() const;
 public:
   JobsList()= default;
   ~JobsList()= default;
-  void addJob(Command* cmd, bool isStopped = false);
+  void addJob(Command* cmd, pid_t pid, bool isStopped = false);
   void printJobsList() const;
   void killAllJobs();
   void removeFinishedJobs();
@@ -152,7 +157,6 @@ public:
   void removeJobById(JobId);
   JobEntry * getLastJob(JobId* lastJobId);
   JobEntry *getLastStoppedJob(JobId* jobId);
-  JobId allocJobId() const;
   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
 
 };
@@ -207,8 +211,8 @@ public:
   // TODO: Add your data members
   string prompt;
   JobsList jobs_list;
-  string prev_dir;
   pid_t pid;
+  string prev_dir;
   SmallShell();
  //public:
   Command *CreateCommand(const char* cmd_line);
