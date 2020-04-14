@@ -13,7 +13,7 @@ using std::vector;
 class Command {
 // TODO: Add your data members
 protected:
-  const string cmd_line;
+  const char *const cmd_line;
   //pid_t pid;
  public:
   bool bg;
@@ -29,7 +29,6 @@ protected:
   string get_cmd_line() const;
   //pid_t get_pid() const;
   //void set_pid(pid_t pid);
-    class Quit : public std::exception{};
 };
 
 class BuiltInCommand : public Command {
@@ -100,12 +99,13 @@ public:
 class JobsList;
 
 class QuitCommand : public BuiltInCommand {
-    // TODO: Add your data members
+    JobsList* to_kill;
+    vector<string> args;
 public:
-  JobsList* to_kill;
-  QuitCommand(const char* cmd_line, JobsList* jobs= nullptr);
+  QuitCommand(const char* cmd_line, JobsList* jobs, vector<string> args);
   virtual ~QuitCommand() {}
   void execute() override;
+  class Quit : public std::exception{};
 };
 
 class CommandsHistory {
@@ -202,10 +202,15 @@ class BackgroundCommand : public BuiltInCommand {
 
 // TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
+    const char* cmd_line;
+    vector<string> args;
  public:
-  CopyCommand(const char* cmd_line);
-  virtual ~CopyCommand() {}
-  void execute() override;
+    CopyCommand(const char* cmd_line, vector<string>& args);
+    virtual ~CopyCommand()= default;
+    void execute() override;
+    void copy(const char* infile, const char* outfile);
+    class CopyError: public std::exception{};
+    class CopyErrorFailedOpen: public std::exception{};
 };
 
 // TODO: add more classes if needed 
@@ -218,6 +223,8 @@ public:
   JobsList jobs_list;
   pid_t pid;
   string prev_dir;
+  pid_t fg_pid;
+  Command* fg_cmd;
   SmallShell();
  //public:
   Command *CreateCommand(const char* cmd_line);
@@ -236,6 +243,7 @@ public:
   void set_prompt(string input_prompt);
   string get_prev_dir() const;
   void set_prev_dir(string new_dir);
+  void set_fg(pid_t fg_pid, Command* fg_cmd);
   // TODO: add extra methods as needed
 };
 

@@ -8,7 +8,9 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include <unistd.h>
-#include <algorithm>
+//#include <algorithm>
+#include <fstream>
+#include <fcntl.h>
 #include "Commands.h"
 
 using namespace std;
@@ -105,10 +107,10 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
+// TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() : prompt("smash"), pid(getpid()), prev_dir(""){
-// TODO: add your implementation
+SmallShell::SmallShell() : prompt("smash"), pid(getpid()),
+    prev_dir(""), fg_pid(0), fg_cmd(nullptr){
 }
 
 SmallShell::~SmallShell() {}
@@ -120,9 +122,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       vector<string> args=_parseCommandLine(cmd_line);
       string cmd_s = string(cmd_line);
       SmallShell& smash= SmallShell::getInstance();
+
       if (cmd_s.find("chprompt") == 0) {
-          return new ChangePromptCommand(cmd_line, args);
-      }
+            return new ChangePromptCommand(cmd_line, args);
+        }
       else if (cmd_s.find("showpid") == 0) {
           return new ShowPidCommand(cmd_line);
       }
@@ -133,13 +136,16 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new ChangeDirCommand(cmd_line, args);
       }
       else if(cmd_s.find("quit") == 0) {
-          return new QuitCommand(cmd_line);
+          return new QuitCommand(cmd_line, &smash.jobs_list, args);
       }
       else if(cmd_s.find("jobs") == 0) {
           return new JobsCommand(cmd_line, &smash.jobs_list);
       }
       else if(cmd_s.find("fg") == 0) {
           return new ForegroundCommand(cmd_line, &smash.jobs_list, args);
+      }
+      else if(cmd_s.find("cp") == 0) {
+          return new CopyCommand(cmd_line, args);
       }
       else {
         return new ExternalCommand(cmd_line);
@@ -148,11 +154,15 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-  // TODO: Add your implementation here
+   if(string(cmd_line).empty())
+        return;
+   char cmd_line_no_bg[strlen(cmd_line)+1];
+   strcpy(cmd_line_no_bg,cmd_line);
+   _removeBackgroundSign(cmd_line_no_bg);
    Command* cmd= nullptr;
    try {
-        cmd = CreateCommand(cmd_line);
-        cmd->bg=_isBackgroundComamnd(cmd_line);
+        cmd = CreateCommand(cmd_line_no_bg);
+        cmd->bg=_isBackgroundComamnd(cmd_line_no_bg);
         cmd->execute();
         if(!cmd->bg)
             delete cmd;
@@ -165,7 +175,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
        cout<<"smash error: cd: OLDPWD not set"<<endl;
        delete cmd;
    }
-   catch(Command::Quit& quit) {
+   catch(QuitCommand::Quit& quit) {
        delete cmd;
        throw quit;
    }
@@ -193,12 +203,18 @@ pid_t SmallShell::get_pid() {
     return pid;
 }
 
+void SmallShell::set_fg(pid_t pid, Command *cmd) {
+    fg_pid=pid;
+    fg_cmd=cmd;
+
+}
+
 Command::Command(const char *cmd_line) : cmd_line(cmd_line){
 
 }
 
 string Command::getCommand() const {
-    return _parseCommandLine(cmd_line.c_str())[0];
+    return _parseCommandLine(cmd_line)[0];
 }
 
 string Command::get_cmd_line() const {
@@ -220,35 +236,33 @@ ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
 }
 
 void ExternalCommand::execute() {
-     if(cmd_line.empty())
-        return;
      SmallShell& smash= SmallShell::getInstance();
-     char cmd[cmd_line.size()+1];
-     strcpy(cmd,cmd_line.c_str());
-     _removeBackgroundSign(cmd);
-     const char* const argv[4] = {"/bin/bash", "-c", cmd, nullptr};
+     const char* const argv[4] = {"/bin/bash", "-c", cmd_line, nullptr};
      pid_t child_pid= fork();
      if(child_pid==0) {
             setpgrp();
             execvp(argv[0], const_cast<char* const*>(argv));
-
-
      }
      else{
          if(bg)
              smash.jobs_list.addJob(this, child_pid);
          else{
-             waitpid(child_pid, NULL, 0);
+             smash.set_fg(child_pid, this);
+             waitpid(child_pid, NULL, WUNTRACED);
+             smash.set_fg(0, nullptr);
          }
      }
 }
 
 
-QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),to_kill(jobs){
+QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs, vector<string> args)
+        : BuiltInCommand(cmd_line),to_kill(jobs), args(args){
 
 }
 
 void QuitCommand::execute() {
+    if(args.size()>1 && args[1]=="kill")
+        to_kill->killAllJobs();
     throw Quit();
 }
 
@@ -267,8 +281,7 @@ std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
 }
 
 void JobsList::JobEntry::Kill() {
-    kill(pid, 9);
-    cout<<"signal number 9 was sent to pid " << pid << endl;
+    kill(pid, SIGKILL);
     delete cmd;
     cmd= nullptr;
 }
@@ -280,9 +293,6 @@ bool JobsList::JobEntry::finish() const {
 }
 
 void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
-    //cout<<"printJobsList:"<<endl;
-    //printJobsList();
-    //removeFinishedJobs();
     list.emplace_back(JobEntry(cmd, pid,allocJobId(), isStopped));
 }
 
@@ -299,6 +309,7 @@ JobsList::JobId JobsList::allocJobId() const {
 
 void JobsList::killAllJobs() {
     removeFinishedJobs();
+    cout<<"smash: sending SIGKILL signals to " << list.size() << " jobs:"<<endl;
     for(auto& job : list){
         job.Kill();
     }
@@ -429,6 +440,87 @@ void ForegroundCommand::execute() {
     }
     kill(job->pid,SIGCONT);
     cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
-    waitpid(job->pid, NULL, 0);
+    auto& smash=SmallShell::getInstance();
+    smash.fg_pid=job->pid;
+    waitpid(job->pid, NULL, WUNTRACED);
+    smash.fg_pid=0;
 }
 
+
+void CopyCommand::copy(const char* infile, const char* outfile) {
+
+    const int BUFSIZE=4096;
+    int infd, outfd;
+    int n;
+    char buf[BUFSIZE];
+
+
+    int src_flags = O_RDONLY;
+    int dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
+    mode_t dest_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; /*rw-rw-rw-*/
+
+
+    try {
+        infd = open(infile, src_flags);
+        if (infd == -1) {
+            throw CopyErrorFailedOpen();//"cannot open src ";
+        }
+
+        outfd = open(outfile, dest_flags, dest_perms);
+        if (outfd == -1) {
+            throw CopyErrorFailedOpen();//cannot open dest
+        }
+
+        while ((n = read(infd, buf, BUFSIZE)) > 0) {
+            if (write(outfd, buf, n) != n)
+                throw CopyError(); //"failed to write buf
+        }
+
+        if (n == -1)
+            throw CopyError();//read() failed
+
+        if (infd)
+            close(infd);
+
+        if (outfd)
+            close(outfd);
+
+    }
+    catch(CopyError&) {
+        if (infd)
+            close(infd);
+
+        if (outfd)
+            close(outfd);
+        perror("smash error: copy failed");
+    }
+    catch(CopyErrorFailedOpen&) {
+        perror("smash error: copy failed");
+    }
+}
+
+CopyCommand::CopyCommand(const char *cmd_line, vector<string>& args) :
+        BuiltInCommand(cmd_line), args(args){}
+
+void CopyCommand::execute() {
+    if(args.size()!=3) {
+        cout << "smash error: fg: invalid arguments" << endl;
+        return;
+    }
+    SmallShell& smash= SmallShell::getInstance();
+    pid_t child_pid= fork();
+    if(child_pid==0) {
+        setpgrp();
+        copy(args[1].c_str(), args[2].c_str());
+        throw QuitCommand::Quit();
+    }
+    else{
+        if(bg)
+            smash.jobs_list.addJob(this, child_pid);
+        else{
+            smash.set_fg(child_pid, this);
+            waitpid(child_pid, NULL, WUNTRACED);
+            smash.set_fg(0, nullptr);
+        }
+    }
+}

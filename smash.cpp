@@ -8,7 +8,7 @@
 
 
 int main(int argc, char* argv[]) {
-    setbuf(stdout,0); //TODO remove
+    setbuf(stdout,nullptr); //TODO remove
     if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
         perror("smash error: failed to set ctrl-Z handler");
     }
@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
         try {
             smash.executeCommand(cmd_line.c_str());
         }
-        catch(Command::Quit&){
+        catch(QuitCommand::Quit&){
             break;
         }
     }
