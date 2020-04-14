@@ -86,7 +86,7 @@ class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members
 public:
     explicit ChangeDirCommand(const char* cmd_line, vector<string> args);
-    ~ChangeDirCommand() override//TODO: free dirs
+    ~ChangeDirCommand() override;//TODO: free dirs
     void execute() override;
 };
 

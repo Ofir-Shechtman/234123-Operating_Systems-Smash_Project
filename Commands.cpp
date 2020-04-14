@@ -117,18 +117,19 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 	//s
   vector<string> args=_parseCommandLine(cmd_line);
   string cmd_s = string(cmd_line);
+  SmallShell& smash= SmallShell::getInstance();
   if (cmd_s.find("chprompt") == 0) {
       return new ChangePromptCommand(cmd_line, args);
   }
-  if (cmd_s.find("showpid") == 0) {
+  else if (cmd_s.find("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
   }
-  if (cmd_s.find("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
-  }
-  if (cmd_s.find("cd") == 0) {
-    return new ChangeDirCommand(cmd_line, args);
-  }
+ // else if (cmd_s.find("pwd") == 0) {
+ //   return new GetCurrDirCommand(cmd_line);
+//  }
+ // else if (cmd_s.find("cd") == 0) {
+ //   return new ChangeDirCommand(cmd_line, args);
+ // }
   else if(cmd_s.find("quit") == 0) {
       return new QuitCommand(cmd_line);
   }
@@ -277,15 +278,15 @@ void ShowPidCommand::execute() {
     cout<<"smash pid is "<<getpid()<<endl;
 }
 
-ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string> args) : BuiltInCommand(cmd_line){
-    SmallShell& smash = SmallShell::getInstance();
-    if(args[1] == "-") next_dir = smash.get_prev_dir();
-    else next_dir = args[1];
-}
+//ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string> args) : BuiltInCommand(cmd_line){
+    //SmallShell& smash = SmallShell::getInstance();
+    //if(args[1] == "-") next_dir = smash.get_prev_dir();
+    //else next_dir = args[1];
+//}
 
-void ChangeDirCommand::execute() {
-    SmallShell& smash = SmallShell::getInstance();
-    smash.set_prev_dir(get_current_dir_name());
+//void ChangeDirCommand::execute() {
+    //SmallShell& smash = SmallShell::getInstance();
+    //smash.set_prev_dir(get_current_dir_name());
 
 
-}
+//}
