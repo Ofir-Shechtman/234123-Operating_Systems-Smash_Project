@@ -114,6 +114,7 @@ SmallShell::~SmallShell() {}
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
+	//s
   vector<string> args=_parseCommandLine(cmd_line);
   string cmd_s = string(cmd_line);
   if (cmd_s.find("chprompt") == 0) {
