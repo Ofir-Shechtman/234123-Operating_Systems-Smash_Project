@@ -14,33 +14,26 @@ class Command {
 // TODO: Add your data members
 protected:
   const char *const cmd_line;
-  //pid_t pid;
  public:
   bool bg;
   explicit Command(const char* cmd_line);
   virtual ~Command()= default;;
   virtual void execute() = 0;
-  //virtual void prepare();
-  //virtual void cleanup();
   // TODO: Add your extra methods if needed
-  //bool isFinish() const;
-  //void Kill() const;
   string getCommand() const;
   string get_cmd_line() const;
-  //pid_t get_pid() const;
-  //void set_pid(pid_t pid);
 };
 
 class BuiltInCommand : public Command {
  public:
   explicit BuiltInCommand(const char* cmd_line);
-  virtual ~BuiltInCommand() {}
+  ~BuiltInCommand() override = default;
 };
 
 class ExternalCommand : public Command {
  public:
   explicit ExternalCommand(const char* cmd_line);
-  virtual ~ExternalCommand() {}
+  ~ExternalCommand() override = default;
   void execute() override;
 };
 
@@ -48,7 +41,7 @@ class PipeCommand : public Command {
   // TODO: Add your data members
  public:
   PipeCommand(const char* cmd_line);
-  virtual ~PipeCommand() {}
+  ~PipeCommand() override = default;
   void execute() override;
 };
 
@@ -56,7 +49,7 @@ class RedirectionCommand : public Command {
  // TODO: Add your data members
  public:
   explicit RedirectionCommand(const char* cmd_line);
-  virtual ~RedirectionCommand() {}
+  ~RedirectionCommand() override = default;
   void execute() override;
   //void prepare() override;
   //void cleanup() override;
@@ -65,7 +58,7 @@ class RedirectionCommand : public Command {
 class ChangePromptCommand : public BuiltInCommand {
     string input_prompt;
 public:
-    explicit ChangePromptCommand(const char* cmd_line, vector<string> args);
+    explicit ChangePromptCommand(const char* cmd_line, vector<string>& args);
     ~ChangePromptCommand() override = default;
     void execute() override;
 };
@@ -88,7 +81,7 @@ class ChangeDirCommand : public BuiltInCommand {
     string next_dir;
 // TODO: Add your data members
 public:
-    explicit ChangeDirCommand(const char* cmd_line, vector<string> args);
+    explicit ChangeDirCommand(const char* cmd_line, vector<string>& args);
     class TooManyArgs : public std::exception{};
     class NoOldPWD : public std::exception{};
     ~ChangeDirCommand() override = default;//TODO: free dirs
@@ -102,32 +95,12 @@ class QuitCommand : public BuiltInCommand {
     JobsList* to_kill;
     vector<string> args;
 public:
-  QuitCommand(const char* cmd_line, JobsList* jobs, vector<string> args);
-  virtual ~QuitCommand() {}
+  QuitCommand(const char* cmd_line, JobsList* jobs, vector<string>& args);
+  ~QuitCommand() override = default;
   void execute() override;
   class Quit : public std::exception{};
 };
 
-class CommandsHistory {
- protected:
-  class CommandHistoryEntry {
-	  // TODO: Add your data members
-  };
- // TODO: Add your data members
- public:
-  CommandsHistory();
-  ~CommandsHistory() {}
-  void addRecord(const char* cmd_line);
-  void printHistory();
-};
-
-class HistoryCommand : public BuiltInCommand {
- // TODO: Add your data members
- public:
-  HistoryCommand(const char* cmd_line, CommandsHistory* history);
-  virtual ~HistoryCommand() {}
-  void execute() override;
-};
 
 class JobsList {
 public:
@@ -144,7 +117,6 @@ private:
         void Kill();
         bool finish() const;
         ~JobEntry()= default;
-        //JobEntry(JobEntry&)= delete;
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
   };
   std::vector<JobEntry> list;
@@ -158,8 +130,8 @@ public:
   void removeFinishedJobs();
   JobEntry * getJobById(JobId);
   void removeJobById(JobId);
-  JobEntry * getLastJob(JobId* lastJobId);
-  JobEntry *getLastStoppedJob(JobId* jobId);
+  JobEntry * getLastJob(const JobId* lastJobId);
+  JobEntry *getLastStoppedJob(const JobId* jobId);
   bool empty() const;
   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
 
@@ -170,7 +142,7 @@ class JobsCommand : public BuiltInCommand {
  JobsList* jobs;
  public:
   JobsCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~JobsCommand() {}
+  ~JobsCommand() override = default;
   void execute() override;
 };
 
@@ -178,7 +150,7 @@ class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
   KillCommand(const char* cmd_line);
-  virtual ~KillCommand() {}
+  ~KillCommand() override = default;
   void execute() override;
 };
 
@@ -186,8 +158,8 @@ class ForegroundCommand : public BuiltInCommand {
     JobsList* jobs;
     vector<string> args;
  public:
-    ForegroundCommand(const char* cmd_line, JobsList* jobs, vector<string> args);
-    virtual ~ForegroundCommand()= default;
+    ForegroundCommand(const char* cmd_line, JobsList* jobs, vector<string>& args);
+    ~ForegroundCommand() override = default;
     void execute() override;
 };
 
@@ -202,13 +174,13 @@ class BackgroundCommand : public BuiltInCommand {
 
 // TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
-    const char* cmd_line;
+    const char* cmd_line{};
     vector<string> args;
  public:
     CopyCommand(const char* cmd_line, vector<string>& args);
-    virtual ~CopyCommand()= default;
+    ~CopyCommand() override = default;
     void execute() override;
-    void copy(const char* infile, const char* outfile);
+    static void copy(const char* infile, const char* outfile);
     class CopyError: public std::exception{};
     class CopyErrorFailedOpen: public std::exception{};
 };
@@ -227,7 +199,7 @@ public:
   Command* fg_cmd;
   SmallShell();
  //public:
-  Command *CreateCommand(const char* cmd_line);
+  static Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
   static SmallShell& getInstance() // make SmallShell singleton
@@ -236,8 +208,8 @@ public:
     // Instantiated on first use.
     return instance;
   }
-  ~SmallShell();
-  void executeCommand(const char* cmd_line);
+  ~SmallShell()= default;
+  static void executeCommand(const char* cmd_line);
   string get_prompt() const;
   pid_t get_pid();
   void set_prompt(string input_prompt);
