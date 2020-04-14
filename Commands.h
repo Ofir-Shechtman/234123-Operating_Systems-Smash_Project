@@ -92,10 +92,9 @@ public:
 class JobsList;
 
 class QuitCommand : public BuiltInCommand {
-    JobsList* to_kill;
     vector<string> args;
 public:
-  QuitCommand(const char* cmd_line, JobsList* jobs, vector<string>& args);
+  QuitCommand(const char* cmd_line, vector<string>& args);
   ~QuitCommand() override = default;
   void execute() override;
   class Quit : public std::exception{};
@@ -121,8 +120,14 @@ private:
   };
   std::vector<JobEntry> list;
   JobId allocJobId() const;
-public:
   JobsList()= default;
+public:
+  static JobsList& getInstance() // make SmallShell singleton
+  {
+    static JobsList instance; // Guaranteed to be destroyed.
+    // Instantiated on first use.
+    return instance;
+  }
   ~JobsList();
   void addJob(Command* cmd, pid_t pid, bool isStopped = false);
   void printJobsList() const;
@@ -139,9 +144,8 @@ public:
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
- JobsList* jobs;
  public:
-  JobsCommand(const char* cmd_line, JobsList* jobs);
+  JobsCommand(const char* cmd_line);
   ~JobsCommand() override = default;
   void execute() override;
 };
@@ -155,18 +159,16 @@ class KillCommand : public BuiltInCommand {
 };
 
 class ForegroundCommand : public BuiltInCommand {
-    JobsList* jobs;
     vector<string> args;
  public:
-    ForegroundCommand(const char* cmd_line, JobsList* jobs, vector<string>& args);
+    ForegroundCommand(const char* cmd_line, vector<string>& args);
     ~ForegroundCommand() override = default;
     void execute() override;
 };
 
 class BackgroundCommand : public BuiltInCommand {
-    JobsList* jobs;
  public:
-    BackgroundCommand(const char* cmd_line, JobsList* jobs);
+    BackgroundCommand(const char* cmd_line);
     virtual ~BackgroundCommand() {}
     void execute() override;
 };
@@ -174,7 +176,7 @@ class BackgroundCommand : public BuiltInCommand {
 
 // TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
-    const char* cmd_line{};
+    const char* cmd_line;
     vector<string> args;
  public:
     CopyCommand(const char* cmd_line, vector<string>& args);
@@ -192,7 +194,6 @@ class SmallShell {
 public:
   // TODO: Add your data members
   string prompt;
-  JobsList jobs_list;
   pid_t pid;
   string prev_dir;
   pid_t fg_pid;

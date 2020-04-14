@@ -10,7 +10,7 @@ void ctrlZHandler(int sig_num) {
     auto& smash=SmallShell::getInstance();
     if(smash.fg_pid) {
         kill(smash.fg_pid, SIGSTOP);
-        smash.jobs_list.addJob(smash.fg_cmd, smash.fg_pid, true);
+        JobsList::getInstance().addJob(smash.fg_cmd, smash.fg_pid, true);
         cout << "smash: process " <<smash.fg_pid << " was stopped" <<endl;
         smash.fg_pid = 0;
     }

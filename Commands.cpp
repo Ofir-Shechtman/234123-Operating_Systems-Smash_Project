@@ -118,8 +118,6 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       _removeBackgroundSign(cmd_line_no_bg);
       vector<string> args=_parseCommandLine(cmd_line_no_bg);
       string cmd_s = string(cmd_line);
-      SmallShell& smash= SmallShell::getInstance();
-
       if (cmd_s.find("chprompt") == 0) {
             return new ChangePromptCommand(cmd_line, args);
         }
@@ -133,13 +131,13 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new ChangeDirCommand(cmd_line, args);
       }
       else if(cmd_s.find("quit") == 0) {
-          return new QuitCommand(cmd_line, &smash.jobs_list, args);
+          return new QuitCommand(cmd_line, args);
       }
       else if(cmd_s.find("jobs") == 0) {
-          return new JobsCommand(cmd_line, &smash.jobs_list);
+          return new JobsCommand(cmd_line);
       }
       else if(cmd_s.find("fg") == 0) {
-          return new ForegroundCommand(cmd_line, &smash.jobs_list, args);
+          return new ForegroundCommand(cmd_line, args);
       }
       else if(cmd_s.find("cp") == 0) {
           return new CopyCommand(cmd_line, args);
@@ -240,7 +238,7 @@ void ExternalCommand::execute() {
      }
      else{
          if(bg)
-             smash.jobs_list.addJob(this, child_pid);
+             JobsList::getInstance().addJob(this, child_pid);
          else{
              smash.set_fg(child_pid, this);
              waitpid(child_pid, nullptr, WUNTRACED);
@@ -250,14 +248,14 @@ void ExternalCommand::execute() {
 }
 
 
-QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs, vector<string>& args)
-        : BuiltInCommand(cmd_line),to_kill(jobs), args(args){
+QuitCommand::QuitCommand(const char *cmd_line, vector<string>& args)
+        : BuiltInCommand(cmd_line), args(args){
 
 }
 
 void QuitCommand::execute() {
     if(args.size()>1 && args[1]=="kill")
-        to_kill->killAllJobs();
+        JobsList::getInstance().killAllJobs();
     throw Quit();
 }
 
@@ -361,12 +359,12 @@ bool JobsList::empty() const {
 }
 
 
-JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs):
-    BuiltInCommand(cmd_line), jobs(jobs){}
+JobsCommand::JobsCommand(const char *cmd_line):
+    BuiltInCommand(cmd_line){}
 
 void JobsCommand::execute() {
-    jobs->removeFinishedJobs();
-    jobs->printJobsList();
+    JobsList::getInstance().removeFinishedJobs();
+    JobsList::getInstance().printJobsList();
 
 }
 
@@ -404,11 +402,11 @@ void ChangeDirCommand::execute() {
     else smash.set_prev_dir(prev_dir);
 }
 
-ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs, vector<string>& args) :
-        BuiltInCommand(cmd_line), jobs(jobs), args(args){}
+ForegroundCommand::ForegroundCommand(const char *cmd_line, vector<string>& args) :
+        BuiltInCommand(cmd_line), args(args){}
 
 void ForegroundCommand::execute() {
-    if(jobs->empty()) {
+    if(JobsList::getInstance().empty()) {
         cout << "smash error: fg: job list is empty" << endl;
         return;
     }
@@ -427,7 +425,7 @@ void ForegroundCommand::execute() {
         cout<<"smash error: fg: invalid arguments"<<endl;
         return;
     }
-    auto job= jobs->getLastJob(job_id);
+    auto job= JobsList::getInstance().getLastJob(job_id);
     if(!job) {
         cout << "smash error: fg: job-id " << *job_id << " does not exist"
              << endl;
@@ -511,7 +509,7 @@ void CopyCommand::execute() {
     }
     else{
         if(bg)
-            smash.jobs_list.addJob(this, child_pid);
+            JobsList::getInstance().addJob(this, child_pid);
         else{
             smash.set_fg(child_pid, this);
             waitpid(child_pid, nullptr, WUNTRACED);
