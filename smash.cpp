@@ -8,7 +8,7 @@
 
 
 int main(int argc, char* argv[]) {
-    setbuf(stdout,0);
+    setbuf(stdout,0); //TODO remove
     if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
         perror("smash error: failed to set ctrl-Z handler");
     }
@@ -21,6 +21,7 @@ int main(int argc, char* argv[]) {
 
     SmallShell& smash = SmallShell::getInstance();
     while(true) {
+        smash.jobs_list.printJobsList();
         std::cout << smash.get_prompt() <<"> ";
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
