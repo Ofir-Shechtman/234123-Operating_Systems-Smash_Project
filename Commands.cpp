@@ -124,7 +124,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       string cmd_s = string(cmd_line);
       if(args.size()>=3){
           for(unsigned int i=1; i<args.size()-1; ++i){
-              if(args[i]=="|")
+              if(args[i]==">")
+                  return new RedirectionCommand(cmd_line, args, ">");
+              else if(args[i]==">>")
+                  return new RedirectionCommand(cmd_line, args, ">>");
+              else if(args[i]=="|")
                   return new PipeCommand(cmd_line, args, "|");
               else if(args[i]=="|&")
                   return new PipeCommand(cmd_line, args, "|&");
@@ -168,6 +172,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
    if(string(cmd_line).empty())
         return;
+
    Command* cmd= nullptr;
    try {
         cmd = CreateCommand(cmd_line);
@@ -175,7 +180,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
         if(!cmd->bg)
             delete cmd;
    }
-   catch(QuitCommand::Quit& quit) {
+   catch(Quit& quit) {
        delete cmd;
        throw quit;
    }
@@ -547,6 +552,7 @@ void BackgroundCommand::execute() {
 }
 
 void CopyCommand::copy(const char* infile, const char* outfile) {
+
     const int BUFSIZE=4096;
     int infd, outfd;
     int n;
@@ -555,6 +561,7 @@ void CopyCommand::copy(const char* infile, const char* outfile) {
     int src_flags = O_RDONLY;
     int dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
     mode_t dest_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; /*rw-rw-rw-*/
+
     try {
         infd = open(infile, src_flags);
         if (infd == -1) {
@@ -609,7 +616,7 @@ void CopyCommand::execute() {
     else if(child_pid==0) {
         setpgrp();
         copy(args[1].c_str(), args[2].c_str());
-        throw QuitCommand::Quit();
+        throw Quit();
     }
     else{
         if(bg)
@@ -641,6 +648,7 @@ void KillCommand::execute() {
 }
 
 KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobsList::JobId job_id) :job_id(job_id){}
+
 PipeCommand::PipeCommand(const char *cmd_line_c, vector<string> &args, const string&  IO_type) :
     Command(cmd_line_c,  _isBackgroundComamnd(cmd_line_c)), IO_type(IO_type){
     string sign= " "+IO_type+" ";
@@ -650,17 +658,33 @@ PipeCommand::PipeCommand(const char *cmd_line_c, vector<string> &args, const str
 }
 
 void PipeCommand::execute() {
-    SmallShell& smash= SmallShell::getInstance();
-    int fd[2];
+/*
     pid_t child_pid= fork();
-    pipe(fd);
     if(child_pid<0)
         perror("smash error: fork failed");
     else if(child_pid==0) {
-        setpgrp();
-        throw QuitCommand::Quit();
+        int fd[2];
+        pipe(fd);
+        pid_t grandchild_pid= fork();
+        if(child_pid<0)
+            perror("smash error: fork failed");
+        else if(grandchild_pid==0) {
+            close(0);
+            dup(fd[1]);
+            cmd_right->execute();
+            throw QuitCommand::Quit();
+        }
+        else{
+            close(1);
+            dup(fd[0]);
+            cmd_left->execute();
+            //waitpid(grandchild_pid, nullptr, WUNTRACED);
+            throw QuitCommand::Quit();
+        }
+
     }
     else{
+        SmallShell& smash= SmallShell::getInstance();
         if(bg)
             SmallShell::getInstance().jobs_list.addJob(this, child_pid);
         else{
@@ -669,4 +693,60 @@ void PipeCommand::execute() {
             smash.set_fg(0, nullptr);
         }
     }
+*/
 }
+
+
+
+RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
+                                       vector<string> &args,
+                                       const string &IO_type) :
+    Command(cmd_line_c,  _isBackgroundComamnd(cmd_line_c)), IO_type(IO_type){
+    string sign= " "+IO_type+" ";
+    int sign_loc=cmd_line.find(sign);
+    cmd_left= SmallShell::CreateCommand(cmd_line.substr(0, sign_loc).c_str());
+    output_file= cmd_line.substr(sign_loc+3,  string::npos);
+}
+
+void RedirectionCommand::execute() {
+    int outfd=-1;
+    int dest_flags=0;
+    if(IO_type==">")
+        dest_flags=O_CREAT | O_WRONLY | O_TRUNC;
+    else if(IO_type==">>")
+        dest_flags= O_CREAT | O_WRONLY | O_TRUNC;//O_APPEND
+    mode_t dest_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; /*rw-rw-rw-*/
+    try {
+        outfd = open(output_file.c_str(), dest_flags, dest_perms);
+        if (outfd == -1) {
+            throw RedirectionFailedOpen();//cannot open dest
+        }
+    }
+    catch(RedirectionFailedOpen&) {
+        perror("smash error: open failed");
+    }
+
+    pid_t child_pid= fork();
+    if(child_pid<0)
+        perror("smash error: fork failed");
+    else if(child_pid==0) {
+        close(1);
+        dup(outfd);
+        cmd_left->execute();
+        throw Quit();
+        }
+
+    else{
+        auto& smash =SmallShell::getInstance();
+        if(bg)
+            smash.jobs_list.addJob(this, child_pid);
+        else{
+            smash.set_fg(child_pid, this);
+            waitpid(child_pid, nullptr, WUNTRACED);
+            smash.set_fg(0, nullptr);
+        }
+    }
+    if (outfd)
+        close(outfd);
+}
+

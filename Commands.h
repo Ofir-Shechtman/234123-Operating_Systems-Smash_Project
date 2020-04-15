@@ -39,10 +39,11 @@ class ExternalCommand : public Command {
   void execute() override;
 };
 
+
 class PipeCommand : public Command {
-  Command* cmd_left;
-  Command* cmd_right;
-  string IO_type;
+    Command* cmd_left;
+    Command* cmd_right;
+    string IO_type;
  public:
   explicit PipeCommand(const char* cmd_line, vector<string> &args, const string&  IO_type);
   ~PipeCommand() override = default;
@@ -50,13 +51,17 @@ class PipeCommand : public Command {
 };
 
 class RedirectionCommand : public Command {
- // TODO: Add your data members
+    Command* cmd_left;
+    string output_file;
+    string IO_type;
  public:
-  explicit RedirectionCommand(const char* cmd_line);
+  explicit RedirectionCommand(const char* cmd_line, vector<string> &args, const string&  IO_type);
   ~RedirectionCommand() override = default;
   void execute() override;
   //void prepare() override;
   //void cleanup() override;
+  class RedirectionFailedOpen : public std::exception{};
+  class RedirectionFailedWrite : public std::exception{};
 };
 
 class ChangePromptCommand : public BuiltInCommand {
@@ -93,7 +98,10 @@ public:
 };
 
 
-class JobsList;
+//class JobsList;
+
+class Quit : public std::exception{};
+
 
 class QuitCommand : public BuiltInCommand {
     vector<string> args;
@@ -101,7 +109,7 @@ public:
   QuitCommand(const char* cmd_line, vector<string>& args);
   ~QuitCommand() override = default;
   void execute() override;
-  class Quit : public std::exception{};
+
 };
 
 
