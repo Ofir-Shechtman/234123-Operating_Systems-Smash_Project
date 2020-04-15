@@ -116,7 +116,7 @@ private:
         JobId job_id;
         bool isStopped;
         JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped);
-        void Kill(int signal= SIGKILL);
+        int Kill(int signal= SIGKILL);
         bool finish() const;
         ~JobEntry()= default;
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
@@ -169,6 +169,13 @@ class ForegroundCommand : public BuiltInCommand {
  public:
     ForegroundCommand(const char* cmd_line, vector<string>& args);
     ~ForegroundCommand() override = default;
+    class FGJobIDDoesntExist: public std::exception{
+    public:
+        JobsList::JobId job_id;
+        explicit FGJobIDDoesntExist(JobsList::JobId job_id);
+    };
+    class FGEmptyJobsList: public std::exception{};
+    class FGInvalidArgs: public std::exception{};
     void execute() override;
 };
 

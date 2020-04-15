@@ -166,7 +166,6 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
    if(string(cmd_line).empty())
         return;
-
    Command* cmd= nullptr;
    try {
         cmd = CreateCommand(cmd_line);
@@ -190,8 +189,20 @@ void SmallShell::executeCommand(const char *cmd_line) {
        cout<<"smash error: kill: invalid arguments"<<endl;
        delete cmd;
    }
-   catch(KillCommand::KillJobIDDoesntExist& jobdoesntexist){
-       cout<<"smash error: kill: job-id "<<jobdoesntexist.job_id<<" does not exist"<<endl;
+   catch(KillCommand::KillJobIDDoesntExist& kill_job_doesnt_exist){
+       cout<<"smash error: kill: job-id "<<kill_job_doesnt_exist.job_id<<" does not exist"<<endl;
+       delete cmd;
+   }
+   catch(ForegroundCommand::FGEmptyJobsList& fgejl){
+       cout<<"smash error: fg: jobs list is empty"<<endl;
+       delete cmd;
+   }
+   catch(ForegroundCommand::FGInvalidArgs& fia){
+       cout<<"smash error: fg: invalid arguments"<<endl;
+       delete cmd;
+   }
+   catch(ForegroundCommand::FGJobIDDoesntExist& fg_job_doesnt_exist){
+       cout<<"smash error: fg: job-id "<<fg_job_doesnt_exist.job_id<<" does not exist"<<endl;
        delete cmd;
    }
    //Please note that you must fork smash process for some commands (e.g., external commands....)
@@ -297,11 +308,11 @@ std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
     return os;
 }
 
-void JobsList::JobEntry::Kill(int signal) {
-    if(kill(pid, signal)==0) cout<<"signal number "<<signal<<" was sent to pid "<<pid<<endl;
+int JobsList::JobEntry::Kill(int signal) {
+    if(kill(pid, signal)==0) return 0;
     else perror("smash error: kill failed");
+    return -1;
 }
-
 
 bool JobsList::JobEntry::finish() const {
     waitpid(pid, nullptr ,WNOHANG); //voodoo for command not found with &
@@ -440,32 +451,23 @@ void ChangeDirCommand::execute() {
 ForegroundCommand::ForegroundCommand(const char *cmd_line, vector<string>& args) :
         BuiltInCommand(cmd_line), args(args){}
 
+ForegroundCommand::FGJobIDDoesntExist::FGJobIDDoesntExist(JobsList::JobId job_id): job_id(job_id){}
+
 void ForegroundCommand::execute() {
-    if(SmallShell::getInstance().jobs_list.empty()) {
-        cout << "smash error: fg: job list is empty" << endl;
-        return;
-    }
+    if(SmallShell::getInstance().jobs_list.empty()) throw FGEmptyJobsList();
+    if(args.size()!= 2 && args.size() != 1) throw FGInvalidArgs();
     JobsList::JobId* job_id = nullptr;
-    bool valid_job_id = true;
-    try {
-        if(args.size()>1) {
+    if(args.size() == 2) {
+        try {
             JobsList::JobId id = stoi(args[1]);
             job_id = &id;
         }
-    }
-    catch(std::invalid_argument const &e) {
-        valid_job_id = false;
-    }
-    if(args.size()>2 || !valid_job_id){
-        cout<<"smash error: fg: invalid arguments"<<endl;
-        return;
+        catch (std::invalid_argument const &e) {
+            throw FGInvalidArgs();
+        }
     }
     auto job= SmallShell::getInstance().jobs_list.getLastJob(job_id);
-    if(!job) {
-        cout << "smash error: fg: job-id " << *job_id << " does not exist"
-             << endl;
-        return;
-    }
+    if(job == nullptr) throw FGJobIDDoesntExist(*job_id);
     job->Kill(SIGCONT);
     job->cmd->bg=false;
     cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
@@ -477,18 +479,14 @@ void ForegroundCommand::execute() {
 
 
 void CopyCommand::copy(const char* infile, const char* outfile) {
-
     const int BUFSIZE=4096;
     int infd, outfd;
     int n;
     char buf[BUFSIZE];
 
-
     int src_flags = O_RDONLY;
     int dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
     mode_t dest_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; /*rw-rw-rw-*/
-
-
     try {
         infd = open(infile, src_flags);
         if (infd == -1) {
@@ -571,11 +569,10 @@ void KillCommand::execute() {
     SmallShell& smash= SmallShell::getInstance();
     auto job= smash.jobs_list.getJobByJobID(job_id);
     if (job == nullptr) throw KillJobIDDoesntExist(job_id);
-    job->Kill(sig_num);
+    if(job->Kill(sig_num)==0) cout<<"signal number "<<signal<<" was sent to pid "<<job->pid<<endl;
 }
 
 KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobsList::JobId job_id) :job_id(job_id){}
-
 PipeCommand::PipeCommand(const char *cmd_line_c, vector<string> &args, const string&  IO_type) :
     Command(cmd_line_c,  _isBackgroundComamnd(cmd_line_c)), IO_type(IO_type){
     string sign= " "+IO_type+" ";
@@ -604,5 +601,5 @@ void PipeCommand::execute() {
             smash.set_fg(0, nullptr);
         }
     }
-
 }
+
