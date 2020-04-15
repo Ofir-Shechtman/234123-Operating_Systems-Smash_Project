@@ -10,9 +10,17 @@ void ctrlZHandler(int sig_num) {
     auto& smash=SmallShell::getInstance();
     if(smash.fg_pid) {
         kill(smash.fg_pid, SIGSTOP);
-        JobsList::getInstance().addJob(smash.fg_cmd, smash.fg_pid, true);
+        smash.fg_cmd->bg= true;
+        auto& job_list=SmallShell::getInstance().jobs_list;
+        auto job = job_list.getJobByPID(smash.fg_pid);
+        if(job) { //was before in bg
+            job->isStopped = true;
+        }
+        else {//never was in bg
+            job_list.addJob(smash.fg_cmd, smash.fg_pid, true);
+        }
         cout << "smash: process " <<smash.fg_pid << " was stopped" <<endl;
-        smash.fg_pid = 0;
+        //smash.set_fg(0, nullptr);
     }
 }
 
@@ -22,7 +30,7 @@ void ctrlCHandler(int sig_num) {
     if(smash.fg_pid) {
         kill(smash.fg_pid, SIGKILL);
         cout << "smash: process " <<smash.fg_pid << " was killed" <<endl;
-        smash.fg_pid = 0;
+        //smash.set_fg(0, nullptr);
     }
 
 }

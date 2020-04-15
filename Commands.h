@@ -13,10 +13,11 @@ using std::vector;
 class Command {
 // TODO: Add your data members
 protected:
-  const char *const cmd_line;
+  const string cmd_line;
+  const string command;
  public:
   bool bg;
-  explicit Command(const char* cmd_line);
+  explicit Command(const char* cmd_line, bool bg);
   virtual ~Command()= default;;
   virtual void execute() = 0;
   // TODO: Add your extra methods if needed
@@ -32,7 +33,7 @@ class BuiltInCommand : public Command {
 
 class ExternalCommand : public Command {
  public:
-  explicit ExternalCommand(const char* cmd_line);
+  explicit ExternalCommand(const char* cmd_line, bool bg);
   ~ExternalCommand() override = default;
   void execute() override;
 };
@@ -110,7 +111,7 @@ private:
         Command* cmd;
         pid_t pid;
         JobId job_id;
-        time_t time_in;
+        time_t time_in;//TODO: move to cmd
         bool isStopped;
         JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped);
         void Kill();
@@ -120,20 +121,15 @@ private:
   };
   std::vector<JobEntry> list;
   JobId allocJobId() const;
-  JobsList()= default;
+
 public:
-  static JobsList& getInstance() // make SmallShell singleton
-  {
-    static JobsList instance; // Guaranteed to be destroyed.
-    // Instantiated on first use.
-    return instance;
-  }
+  JobsList()= default;
   ~JobsList();
   void addJob(Command* cmd, pid_t pid, bool isStopped = false);
   void printJobsList() const;
   void killAllJobs();
   void removeFinishedJobs();
-  JobEntry * getJobById(JobId);
+  JobEntry * getJobByPID(pid_t);
   void removeJobById(JobId);
   JobEntry * getLastJob(const JobId* lastJobId);
   JobEntry *getLastStoppedJob(const JobId* jobId);
@@ -176,7 +172,7 @@ class BackgroundCommand : public BuiltInCommand {
 
 // TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
-    const char* cmd_line;
+    const char* cmd_line{};
     vector<string> args;
  public:
     CopyCommand(const char* cmd_line, vector<string>& args);
@@ -198,6 +194,7 @@ public:
   string prev_dir;
   pid_t fg_pid;
   Command* fg_cmd;
+  JobsList jobs_list;
   SmallShell();
  //public:
   static Command *CreateCommand(const char* cmd_line);

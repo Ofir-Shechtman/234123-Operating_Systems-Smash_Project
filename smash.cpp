@@ -20,9 +20,7 @@ int main(int argc, char* argv[]) {
 
 
     SmallShell& smash = SmallShell::getInstance();
-    //JobsList& job_list = JobsList::getInstance();
     while(true) {
-        //smash.jobs_list.printJobsList();
         std::cout << smash.get_prompt() <<"> ";
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
