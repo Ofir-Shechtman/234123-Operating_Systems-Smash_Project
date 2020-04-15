@@ -114,7 +114,7 @@ private:
         time_t time_in;//TODO: move to cmd
         bool isStopped;
         JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped);
-        void Kill();
+        void Kill(int signal = SIGKILL);
         bool finish() const;
         ~JobEntry()= default;
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
@@ -130,6 +130,7 @@ public:
   void killAllJobs();
   void removeFinishedJobs();
   JobEntry * getJobByPID(pid_t);
+  JobEntry * getJobByJobID(JobId);
   void removeJobById(JobId);
   JobEntry * getLastJob(const JobId* lastJobId);
   JobEntry *getLastStoppedJob(const JobId* jobId);
@@ -147,11 +148,18 @@ class JobsCommand : public BuiltInCommand {
 };
 
 class KillCommand : public BuiltInCommand {
- // TODO: Add your data members
- public:
-  KillCommand(const char* cmd_line);
-  ~KillCommand() override = default;
-  void execute() override;
+    JobsList::JobId job_id;
+    int sig_num;
+public:
+    KillCommand(const char *cmdLine1, vector<string> &args);
+    ~KillCommand() override = default;
+    class KillJobIDDoesntExist: public std::exception{
+    public:
+        JobsList::JobId job_id;
+        explicit KillJobIDDoesntExist(JobsList::JobId job_id);
+    };
+    class KillInvalidArgs: public std::exception{};
+    void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {

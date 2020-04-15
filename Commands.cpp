@@ -134,6 +134,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       else if (cmd_s.find("cd") == 0) {
         return new ChangeDirCommand(cmd_line, args);
       }
+      else if (cmd_s.find("kill") == 0) {
+          return new KillCommand(cmd_line, args);
+      }
       else if(cmd_s.find("quit") == 0) {
           return new QuitCommand(cmd_line, args);
       }
@@ -170,6 +173,14 @@ void SmallShell::executeCommand(const char *cmd_line) {
    }
    catch(ChangeDirCommand::NoOldPWD& nop){
        cout<<"smash error: cd: OLDPWD not set"<<endl;
+       delete cmd;
+   }
+   catch(KillCommand::KillInvalidArgs& kia){
+       cout<<"smash error: kill: invalid arguments"<<endl;
+       delete cmd;
+   }
+   catch(KillCommand::KillJobIDDoesntExist& jobdoesntexist){
+       cout<<"smash error: kill: job-id "<<jobdoesntexist.job_id<<" does not exist"<<endl;
        delete cmd;
    }
    catch(QuitCommand::Quit& quit) {
@@ -277,8 +288,9 @@ std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
     return os;
 }
 
-void JobsList::JobEntry::Kill() {
-    kill(pid, SIGKILL);
+void JobsList::JobEntry::Kill(int signal) {
+    if(kill(pid, signal)==0) cout<<"signal number "<<signal<<" was sent to pid "<<pid<<endl;
+    else perror("smash error: kill failed");
 }
 
 
@@ -321,12 +333,24 @@ void JobsList::removeFinishedJobs() {
 }
 
 JobsList::JobEntry *JobsList::getJobByPID(pid_t pid) {
+    removeFinishedJobs();
     for(auto& job : list){
         if(job.pid==pid)
             return &job;
     }
     return nullptr;
 }
+
+
+JobsList::JobEntry* JobsList::getJobByJobID(JobsList::JobId jobid) {
+    removeFinishedJobs();
+    for(auto& job : list){
+        if(job.job_id==jobid)
+            return &job;
+    }
+    return nullptr;
+}
+
 
 JobsList::JobEntry *JobsList::getLastJob(const JobsList::JobId* lastJobId) {
     removeFinishedJobs();
@@ -360,7 +384,6 @@ JobsList::~JobsList() {
 bool JobsList::empty() const {
     return list.empty();
 }
-
 
 JobsCommand::JobsCommand(const char *cmd_line):
     BuiltInCommand(cmd_line){}
@@ -521,3 +544,23 @@ void CopyCommand::execute() {
         }
     }
 }
+
+KillCommand::KillCommand(const char *cmdLine1, vector<string> &args) : BuiltInCommand(cmdLine1) {
+    if(args.size() != 3 || args[1].substr(0,1) != "-") throw KillInvalidArgs();
+    try {
+        sig_num = stoi(args[1].substr(1));
+        job_id = stoi(args[2]);
+    }
+    catch(std::invalid_argument const &e) {
+        throw KillInvalidArgs();
+    }
+}
+
+void KillCommand::execute() {
+    SmallShell& smash= SmallShell::getInstance();
+    auto job= smash.jobs_list.getJobByJobID(job_id);
+    if (job == nullptr) throw KillJobIDDoesntExist(job_id);
+    job->Kill(sig_num);
+}
+
+KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobsList::JobId job_id) :job_id(job_id){}
