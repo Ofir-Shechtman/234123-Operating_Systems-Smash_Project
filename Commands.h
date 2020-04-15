@@ -135,7 +135,7 @@ public:
   JobEntry * getJobByJobID(JobId);
   void removeJobById(JobId);
   JobEntry * getLastJob(const JobId* lastJobId);
-  JobEntry *getLastStoppedJob(const JobId* jobId);
+  JobEntry *getLastStoppedJob();
   bool empty() const;
   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
 
@@ -180,9 +180,22 @@ class ForegroundCommand : public BuiltInCommand {
 };
 
 class BackgroundCommand : public BuiltInCommand {
- public:
-    BackgroundCommand(const char* cmd_line);
-    virtual ~BackgroundCommand() {}
+    vector<string> args;
+public:
+    BackgroundCommand(const char* cmd_line, vector<string>& args);
+    ~BackgroundCommand() override = default;
+    class BGJobIDDoesntExist: public std::exception{
+    public:
+        JobsList::JobId job_id;
+        explicit BGJobIDDoesntExist(JobsList::JobId job_id);
+    };
+    class BGJobAlreadyRunning: public std::exception{
+    public:
+        JobsList::JobId job_id;
+        explicit BGJobAlreadyRunning(JobsList::JobId job_id);
+    };
+    class BGNoStoppedJobs: public std::exception{};
+    class BGInvalidArgs: public std::exception{};
     void execute() override;
 };
 

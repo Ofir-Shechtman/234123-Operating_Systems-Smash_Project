@@ -154,6 +154,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       else if(cmd_s.find("fg") == 0) {
           return new ForegroundCommand(cmd_line, args);
       }
+      else if(cmd_s.find("bg") == 0) {
+          return new BackgroundCommand(cmd_line, args);
+      }
       else if(cmd_s.find("cp") == 0) {
           return new CopyCommand(cmd_line, args);
       }
@@ -201,10 +204,27 @@ void SmallShell::executeCommand(const char *cmd_line) {
        cout<<"smash error: fg: invalid arguments"<<endl;
        delete cmd;
    }
-   catch(ForegroundCommand::FGJobIDDoesntExist& fg_job_doesnt_exist){
-       cout<<"smash error: fg: job-id "<<fg_job_doesnt_exist.job_id<<" does not exist"<<endl;
+   catch(ForegroundCommand::FGJobIDDoesntExist& fg_job_doesnt_exist) {
+       cout << "smash error: fg: job-id " << fg_job_doesnt_exist.job_id << " does not exist" << endl;
        delete cmd;
    }
+   catch(BackgroundCommand::BGJobIDDoesntExist& bg_job_doesnt_exist){
+       cout<<"smash error: bg: job-id "<<bg_job_doesnt_exist.job_id<<" does not exist"<<endl;
+       delete cmd;
+   }
+   catch(BackgroundCommand::BGJobAlreadyRunning& bg_job_already_running){
+       cout<<"smash error: bg: job-id "<<bg_job_already_running.job_id<<" is already running in the background"<<endl;
+       delete cmd;
+   }
+   catch(BackgroundCommand::BGNoStoppedJobs& bgnsj){
+       cout<<"smash error: bg: there is no stopped jobs to resume"<<endl;
+       delete cmd;
+   }
+   catch(BackgroundCommand::BGInvalidArgs& bia){
+       cout<<"smash error: bg: invalid arguments"<<endl;
+       delete cmd;
+   }
+
    //Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
@@ -383,12 +403,10 @@ JobsList::JobEntry *JobsList::getLastJob(const JobsList::JobId* lastJobId) {
     return nullptr;
 }
 
-JobsList::JobEntry *JobsList::getLastStoppedJob(const JobsList::JobId* jobId) {
+JobsList::JobEntry *JobsList::getLastStoppedJob() {
     removeFinishedJobs();
     JobEntry* last_job = nullptr;
     for(auto& job : list){
-        if(job.job_id==*jobId)
-            return &job;
         if(job.isStopped)
             last_job=&job;
     }
@@ -477,6 +495,37 @@ void ForegroundCommand::execute() {
     smash.set_fg(0, nullptr);
 }
 
+BackgroundCommand::BackgroundCommand(const char *cmd_line, vector<string> &args):
+        BuiltInCommand(cmd_line), args(args){}
+
+BackgroundCommand::BGJobIDDoesntExist::BGJobIDDoesntExist(JobsList::JobId job_id): job_id(job_id){}
+
+BackgroundCommand::BGJobAlreadyRunning::BGJobAlreadyRunning(JobsList::JobId job_id): job_id(job_id){}
+
+void BackgroundCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    if(args.size() != 1 && args.size() != 2) throw BGInvalidArgs();
+    JobsList::JobId* job_id = nullptr;
+    if(args.size() == 2) {
+        try {
+            JobsList::JobId id = stoi(args[1]);
+            job_id = &id;}
+        catch (std::invalid_argument const &e) {
+            throw BGInvalidArgs();}
+    }
+    auto job = smash.jobs_list.getLastStoppedJob();
+    if(args.size() == 1) {
+        if (job == nullptr) throw BGNoStoppedJobs();
+    }
+    if(args.size() == 2){
+        job = smash.jobs_list.getJobByJobID(*job_id);
+        if(job == nullptr) throw BGJobIDDoesntExist(*job_id);
+        if(!job->isStopped) throw BGJobAlreadyRunning(*job_id);
+    }
+    cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
+    job->isStopped = false;
+    job->Kill(SIGCONT);
+}
 
 void CopyCommand::copy(const char* infile, const char* outfile) {
     const int BUFSIZE=4096;
@@ -569,7 +618,7 @@ void KillCommand::execute() {
     SmallShell& smash= SmallShell::getInstance();
     auto job= smash.jobs_list.getJobByJobID(job_id);
     if (job == nullptr) throw KillJobIDDoesntExist(job_id);
-    if(job->Kill(sig_num)==0) cout<<"signal number "<<signal<<" was sent to pid "<<job->pid<<endl;
+    if(job->Kill(sig_num)==0) cout<<"signal number "<<sig_num<<" was sent to pid "<<job->pid<<endl;
 }
 
 KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobsList::JobId job_id) :job_id(job_id){}
@@ -602,4 +651,3 @@ void PipeCommand::execute() {
         }
     }
 }
-
