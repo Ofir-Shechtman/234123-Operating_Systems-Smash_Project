@@ -165,7 +165,6 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       }
 }
 
-
 void SmallShell::executeCommand(const char *cmd_line) {
    if(string(cmd_line).empty())
         return;
@@ -329,7 +328,18 @@ std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
 }
 
 int JobsList::JobEntry::Kill(int signal) {
-    if(kill(pid, signal)==0) return 0;
+    SmallShell& smash = SmallShell::getInstance();
+    if(kill(pid, signal)==0) {
+        if(signal == SIGCONT) {
+            isStopped = false;
+            smash.jobs_list.removeFromStopped(job_id);
+        }
+        if(signal == SIGSTOP) {
+            isStopped = true;
+            smash.jobs_list.pushToStopped(this);
+        }
+        return 0;
+    }
     else perror("smash error: kill failed");
     return -1;
 }
@@ -404,13 +414,8 @@ JobsList::JobEntry *JobsList::getLastJob(const JobsList::JobId* lastJobId) {
 }
 
 JobsList::JobEntry *JobsList::getLastStoppedJob() {
-    removeFinishedJobs();
-    JobEntry* last_job = nullptr;
-    for(auto& job : list){
-        if(job.isStopped)
-            last_job=&job;
-    }
-    return last_job;
+    if(last_stopped_jobs.empty()) return nullptr;
+    return last_stopped_jobs.front();
 }
 
 JobsList::~JobsList() {
@@ -422,6 +427,21 @@ JobsList::~JobsList() {
 bool JobsList::empty() const {
     return list.empty();
 }
+
+void JobsList::removeFromStopped(JobId job_id) {
+    for (auto job = last_stopped_jobs.begin(); job != last_stopped_jobs.end();) {
+        if ((*job)->job_id == job_id)
+            last_stopped_jobs.erase(job);
+        else {
+            ++job;
+        }
+    }
+}
+
+void JobsList::pushToStopped(JobEntry* job) {
+    last_stopped_jobs.push_back(job);
+}
+
 
 JobsCommand::JobsCommand(const char *cmd_line):
     BuiltInCommand(cmd_line){}
@@ -523,7 +543,6 @@ void BackgroundCommand::execute() {
         if(!job->isStopped) throw BGJobAlreadyRunning(*job_id);
     }
     cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
-    job->isStopped = false;
     job->Kill(SIGCONT);
 }
 

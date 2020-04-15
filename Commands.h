@@ -122,8 +122,8 @@ private:
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
   };
   std::vector<JobEntry> list;
+  vector<JobsList::JobEntry*> last_stopped_jobs;
   JobId allocJobId() const;
-
 public:
   JobsList()= default;
   ~JobsList();
@@ -136,6 +136,9 @@ public:
   void removeJobById(JobId);
   JobEntry * getLastJob(const JobId* lastJobId);
   JobEntry *getLastStoppedJob();
+  void removeFromStopped(JobId);
+  void pushToStopped(JobEntry*);
+
   bool empty() const;
   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
 
