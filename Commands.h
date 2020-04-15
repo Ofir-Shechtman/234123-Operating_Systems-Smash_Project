@@ -17,6 +17,7 @@ protected:
   const string command;
  public:
   bool bg;
+  const time_t time_in;
   explicit Command(const char* cmd_line, bool bg);
   virtual ~Command()= default;;
   virtual void execute() = 0;
@@ -39,9 +40,11 @@ class ExternalCommand : public Command {
 };
 
 class PipeCommand : public Command {
-  // TODO: Add your data members
+  Command* cmd_left;
+  Command* cmd_right;
+  string IO_type;
  public:
-  PipeCommand(const char* cmd_line);
+  explicit PipeCommand(const char* cmd_line, vector<string> &args, const string&  IO_type);
   ~PipeCommand() override = default;
   void execute() override;
 };
@@ -111,10 +114,9 @@ private:
         Command* cmd;
         pid_t pid;
         JobId job_id;
-        time_t time_in;//TODO: move to cmd
         bool isStopped;
         JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped);
-        void Kill(int signal = SIGKILL);
+        void Kill(int signal= SIGKILL);
         bool finish() const;
         ~JobEntry()= default;
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
