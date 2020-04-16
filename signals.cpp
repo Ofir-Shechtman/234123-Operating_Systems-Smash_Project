@@ -32,7 +32,6 @@ void ctrlCHandler(int sig_num) {
         cout << "smash: process " <<smash.fg_pid << " was killed" <<endl;
         //smash.set_fg(0, nullptr);
     }
-
 }
 
 void alarmHandler(int sig_num) {

@@ -15,7 +15,7 @@ class Command {
 protected:
   const string cmd_line;
   const string command;
- public:
+public:
   bool bg;
   const time_t time_in;
   explicit Command(const char* cmd_line, bool bg);
@@ -39,15 +39,14 @@ class ExternalCommand : public Command {
   void execute() override;
 };
 
-
 class PipeCommand : public Command {
-    Command* cmd_left;
-    Command* cmd_right;
-    string IO_type;
- public:
-  explicit PipeCommand(const char* cmd_line, vector<string> &args, const string&  IO_type);
-  ~PipeCommand() override = default;
-  void execute() override;
+    Command* command1;
+    Command* command2;
+    string sign;
+public:
+      explicit PipeCommand(const char* cmd_line_c, vector<string> args, string sign);
+      ~PipeCommand() override = default;
+      void execute() override;
 };
 
 class RedirectionCommand : public Command {
@@ -155,7 +154,7 @@ public:
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  JobsCommand(const char* cmd_line);
+  explicit JobsCommand(const char* cmd_line);
   ~JobsCommand() override = default;
   void execute() override;
 };
