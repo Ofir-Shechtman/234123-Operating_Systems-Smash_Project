@@ -118,13 +118,13 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       if(args.size()>=3){
           for(unsigned int i=1; i<args.size()-1; ++i){
               if(args[i]==">")
-                  return new RedirectionCommand(cmd_line, args, ">");
+                  return new RedirectionCommand(cmd_line_no_bg, ">", _isBackgroundComamnd(cmd_line));
               else if(args[i]==">>")
-                  return new RedirectionCommand(cmd_line, args, ">>");
+                  return new RedirectionCommand(cmd_line_no_bg, ">>", _isBackgroundComamnd(cmd_line));
               else if(args[i]=="|")
-                  return new PipeCommand(cmd_line, args, "|");
+                  return new PipeCommand(cmd_line_no_bg, args, "|", _isBackgroundComamnd(cmd_line));
               else if(args[i]=="|&")
-                  return new PipeCommand(cmd_line, args, "|&");
+                  return new PipeCommand(cmd_line_no_bg, args, "|&", _isBackgroundComamnd(cmd_line));
           }
       }
       if (cmd_s.find("chprompt") == 0) {
@@ -165,6 +165,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
    if(string(cmd_line).empty())
         return;
+
    Command* cmd= nullptr;
    try {
         cmd = CreateCommand(cmd_line);
@@ -220,7 +221,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
        cout<<"smash error: bg: invalid arguments"<<endl;
        delete cmd;
    }
-   //Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
 string SmallShell::get_prompt() const {
@@ -262,7 +262,6 @@ string Command::get_cmd_line() const {
 }
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line, _isBackgroundComamnd(cmd_line)) {
-
 }
 
 void GetCurrDirCommand::execute() {
@@ -271,7 +270,8 @@ void GetCurrDirCommand::execute() {
     free(pwd);
 }
 
-ExternalCommand::ExternalCommand(const char *cmd_line, bool bg) : Command(cmd_line, bg) {}
+ExternalCommand::ExternalCommand(const char *cmd_line, bool bg) : Command(cmd_line, bg) {
+}
 
 void ExternalCommand::execute() {
      SmallShell& smash= SmallShell::getInstance();
@@ -341,6 +341,10 @@ bool JobsList::JobEntry::finish() const {
     return  waitpid(pid, nullptr ,WNOHANG)==-1 && !isStopped;
 }
 
+JobsList::JobEntry::~JobEntry() {
+    delete cmd;
+}
+
 void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
     removeFinishedJobs();
     list.emplace_back(JobEntry(cmd, pid,allocJobId(), isStopped));
@@ -406,11 +410,6 @@ JobsList::JobEntry *JobsList::getLastJob(const JobsList::JobId* lastJobId) {
 JobsList::JobEntry *JobsList::getLastStoppedJob() {
     if(last_stopped_jobs.empty()) return nullptr;
     return last_stopped_jobs.front();
-}
-
-JobsList::~JobsList() {
-    for(auto j: list)
-        delete j.cmd;
 }
 
 bool JobsList::empty() const {
@@ -632,7 +631,9 @@ void KillCommand::execute() {
 
 KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobsList::JobId job_id) :job_id(job_id){}
 
-PipeCommand::PipeCommand(const char *cmd_line_c, vector<string> args, string sign): Command(cmd_line_c, _isBackgroundComamnd(cmd_line_c)), sign(sign) {
+PipeCommand::PipeCommand(const char *cmd_line_c, vector<string> args, string sign, bool bg):
+    Command(cmd_line_c, bg), sign(sign)
+{
     string s_command1, s_command2;
     int sign_index = cmd_line.find(sign);
     s_command1 = cmd_line.substr(0,sign_index);
@@ -640,6 +641,8 @@ PipeCommand::PipeCommand(const char *cmd_line_c, vector<string> args, string sig
     else if(sign == "|&") s_command2 = cmd_line.substr(sign_index+3,cmd_line.size()-1);
     command1 = SmallShell::CreateCommand(s_command1.c_str());
     command2 = SmallShell::CreateCommand(s_command2.c_str());
+    command1->bg=false;
+    command2->bg=false;
 }
 
 void PipeCommand::execute() {
@@ -650,9 +653,8 @@ void PipeCommand::execute() {
     if(child_pid1<0) perror("smash error: fork failed");
     else if(child_pid1==0) {
         setpgrp();
-        if(sign == "|") close(1);
-        if(sign == "|&") close(2);
-        dup(my_pipe[1]);
+        close(0);
+        dup(my_pipe[0]);
         command1->execute();
         throw Quit();
     } else if(child_pid1>0) {
@@ -660,15 +662,16 @@ void PipeCommand::execute() {
         if (child_pid2 < 0) perror("smash error: fork failed");
         else if (child_pid2 == 0) {
             setpgrp();
-            close(0);
-            dup(my_pipe[0]);
-            if (!bg) waitpid(child_pid1, nullptr, WUNTRACED);
+            if(sign == "|") close(1);
+            if(sign == "|&") close(2);
+            dup(my_pipe[1]);
+            //if (!bg) waitpid(child_pid1, nullptr, WUNTRACED);
             command2->execute();
             throw Quit();
-        } else if ((child_pid2 > 0) && (bg)) {
+        } else if (bg) {
             smash.jobs_list.addJob(command1, child_pid1);
             smash.jobs_list.addJob(command2, child_pid2);
-        } else if ((child_pid2 > 0) && (!bg)) {
+        } else {
             smash.set_fg(child_pid1, this);
             waitpid(child_pid1, nullptr, WUNTRACED);
             smash.set_fg(child_pid2, this);
@@ -677,16 +680,14 @@ void PipeCommand::execute() {
         }
     }
 }
-
-
 RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
-                                       vector<string> &args,
-                                       const string &IO_type) :
-    Command(cmd_line_c,  _isBackgroundComamnd(cmd_line_c)), IO_type(IO_type){
+                                       const string &IO_type,
+                                       bool bg) :
+    Command(cmd_line_c,  bg), IO_type(IO_type){
     string sign= " "+IO_type+" ";
     int sign_loc=cmd_line.find(sign);
     cmd_left= SmallShell::CreateCommand(cmd_line.substr(0, sign_loc).c_str());
-    output_file= cmd_line.substr(sign_loc+3,  string::npos);
+    output_file= cmd_line.substr(sign_loc+sign.size(),  string::npos);
 }
 
 void RedirectionCommand::execute() {
@@ -695,7 +696,7 @@ void RedirectionCommand::execute() {
     if(IO_type==">")
         dest_flags=O_CREAT | O_WRONLY | O_TRUNC;
     else if(IO_type==">>")
-        dest_flags= O_CREAT | O_WRONLY | O_TRUNC;//O_APPEND
+        dest_flags= O_CREAT | O_RDWR  | O_APPEND;
     mode_t dest_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; /*rw-rw-rw-*/
     try {
         outfd = open(output_file.c_str(), dest_flags, dest_perms);
@@ -706,6 +707,7 @@ void RedirectionCommand::execute() {
     catch(RedirectionFailedOpen&) {
         perror("smash error: open failed");
     }
+
     pid_t child_pid= fork();
     if(child_pid<0)
         perror("smash error: fork failed");

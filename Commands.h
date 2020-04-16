@@ -44,7 +44,7 @@ class PipeCommand : public Command {
     Command* command2;
     string sign;
 public:
-      explicit PipeCommand(const char* cmd_line_c, vector<string> args, string sign);
+      explicit PipeCommand(const char* cmd_line_c, vector<string> args, string sign, bool bg);
       ~PipeCommand() override = default;
       void execute() override;
 };
@@ -54,7 +54,7 @@ class RedirectionCommand : public Command {
     string output_file;
     string IO_type;
  public:
-  explicit RedirectionCommand(const char* cmd_line, vector<string> &args, const string&  IO_type);
+  explicit RedirectionCommand(const char* cmd_line, const string&  IO_type, bool bg);
   ~RedirectionCommand() override = default;
   void execute() override;
   //void prepare() override;
@@ -125,7 +125,7 @@ private:
         JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped);
         int Kill(int signal= SIGKILL);
         bool finish() const;
-        ~JobEntry()= default;
+        ~JobEntry();
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
   };
   std::vector<JobEntry> list;
@@ -133,7 +133,7 @@ private:
   JobId allocJobId() const;
 public:
   JobsList()= default;
-  ~JobsList();
+  ~JobsList()= default;
   void addJob(Command* cmd, pid_t pid, bool isStopped = false);
   void printJobsList() const;
   void killAllJobs();
