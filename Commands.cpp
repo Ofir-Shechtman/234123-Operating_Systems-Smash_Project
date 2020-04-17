@@ -341,10 +341,6 @@ bool JobsList::JobEntry::finish() const {
     return  waitpid(pid, nullptr ,WNOHANG)==-1 && !isStopped;
 }
 
-JobsList::JobEntry::~JobEntry() {
-    delete cmd;
-}
-
 void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
     removeFinishedJobs();
     list.emplace_back(JobEntry(cmd, pid,allocJobId(), isStopped));
@@ -410,6 +406,11 @@ JobsList::JobEntry *JobsList::getLastJob(const JobsList::JobId* lastJobId) {
 JobsList::JobEntry *JobsList::getLastStoppedJob() {
     if(last_stopped_jobs.empty()) return nullptr;
     return last_stopped_jobs.front();
+}
+
+JobsList::~JobsList() {
+    for(auto j: list)
+        delete j.cmd;
 }
 
 bool JobsList::empty() const {
@@ -696,7 +697,7 @@ void RedirectionCommand::execute() {
     if(IO_type==">")
         dest_flags=O_CREAT | O_WRONLY | O_TRUNC;
     else if(IO_type==">>")
-        dest_flags= O_CREAT | O_RDWR  | O_APPEND;
+        dest_flags= O_CREAT | O_RDWR | O_APPEND;
     mode_t dest_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; /*rw-rw-rw-*/
     try {
         outfd = open(output_file.c_str(), dest_flags, dest_perms);
