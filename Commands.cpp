@@ -337,13 +337,17 @@ int JobsList::JobEntry::Kill(int signal) {
 }
 
 bool JobsList::JobEntry::finish() const {
-    //int ret1 = waitpid(pid, nullptr ,WNOHANG); //voodoo for command not found with &
+    waitpid(pid, nullptr ,WNOHANG); //voodoo for command not found with &
     return  waitpid(pid, nullptr ,WNOHANG)==-1 && !isStopped;
+}
+
+JobsList::JobEntry::~JobEntry() {
+    delete cmd;
 }
 
 void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
     removeFinishedJobs();
-    list.emplace_back(JobEntry(cmd, pid,allocJobId(), isStopped));
+    list.emplace_back(cmd, pid,allocJobId(), isStopped);
 }
 
 void JobsList::printJobsList() const{
@@ -406,11 +410,6 @@ JobsList::JobEntry *JobsList::getLastJob(const JobsList::JobId* lastJobId) {
 JobsList::JobEntry *JobsList::getLastStoppedJob() {
     if(last_stopped_jobs.empty()) return nullptr;
     return last_stopped_jobs.front();
-}
-
-JobsList::~JobsList() {
-    for(auto j: list)
-        delete j.cmd;
 }
 
 bool JobsList::empty() const {

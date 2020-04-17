@@ -125,7 +125,7 @@ private:
         JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped);
         int Kill(int signal= SIGKILL);
         bool finish() const;
-        ~JobEntry()= default;
+        ~JobEntry();
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
   };
   std::vector<JobEntry> list;
@@ -133,7 +133,7 @@ private:
   JobId allocJobId() const;
 public:
   JobsList()= default;
-  ~JobsList();
+  ~JobsList()= default;
   void addJob(Command* cmd, pid_t pid, bool isStopped = false);
   void printJobsList() const;
   void killAllJobs();
