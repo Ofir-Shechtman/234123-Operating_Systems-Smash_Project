@@ -5,6 +5,7 @@
 #include "Commands.h"
 #include "signals.h"
 #include <fstream>
+#include "system_functions.h"
 
 
 int main(int argc, char* argv[]) {
@@ -26,6 +27,9 @@ int main(int argc, char* argv[]) {
         std::getline(std::cin, cmd_line);
         try {
             smash.executeCommand(cmd_line.c_str());
+        }
+        catch(Continue&){
+            continue;
         }
         catch(Quit&){
             break;
