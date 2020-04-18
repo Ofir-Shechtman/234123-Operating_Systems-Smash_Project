@@ -183,6 +183,9 @@ void SmallShell::executeCommand(const char *cmd_line) {
        cout<<"smash error: cd: too many arguments"<<endl;
        delete cmd;
    }
+   catch(ChangeDirCommand::TooFewArgs& tfa){
+       delete cmd;
+   }
    catch(ChangeDirCommand::NoOldPWD& nop){
        cout<<"smash error: cd: OLDPWD not set"<<endl;
        delete cmd;
@@ -438,7 +441,6 @@ JobsCommand::JobsCommand(const char *cmd_line):
 void JobsCommand::execute() {
     SmallShell::getInstance().jobs_list.removeFinishedJobs();
     SmallShell::getInstance().jobs_list.printJobsList();
-
 }
 
 ChangePromptCommand::ChangePromptCommand(const char* cmd_line, vector<string>& args) : BuiltInCommand(cmd_line) {
@@ -459,6 +461,7 @@ void ShowPidCommand::execute() {
 ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string>& args) : BuiltInCommand(cmd_line){
     SmallShell& smash = SmallShell::getInstance();
     if(args.size()>2) throw TooManyArgs();
+    if(args.size()<2) throw TooFewArgs();
     if(args[1] == "-") {
         next_dir = smash.get_prev_dir();
         if(next_dir.empty()) throw NoOldPWD();

@@ -99,6 +99,7 @@ class ChangeDirCommand : public BuiltInCommand {
 public:
     explicit ChangeDirCommand(const char* cmd_line, vector<string>& args);
     class TooManyArgs : public std::exception{};
+    class TooFewArgs : public std::exception{};
     class NoOldPWD : public std::exception{};
     ~ChangeDirCommand() override = default;//TODO: free dirs
     void execute() override;
