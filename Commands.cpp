@@ -112,24 +112,25 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       _removeBackgroundSign(cmd_line_no_bg);
       vector<string> args=_parseCommandLine(cmd_line_no_bg);
       string cmd_s = string(cmd_line);
-      if(cmd_s.find('>') != string::npos) {
-            return new RedirectionCommand(cmd_line_no_bg, ">", _isBackgroundComamnd(cmd_line));
+
+      if(cmd_s.find(">>") != string::npos) {
+        return new RedirectionCommand(cmd_line_no_bg, ">>");
       }
-      else if(cmd_s.find(">>") != string::npos) {
-          return new RedirectionCommand(cmd_line_no_bg, ">>", _isBackgroundComamnd(cmd_line));
-      }
-      else if(cmd_s.find('|') != string::npos) {
-          return new PipeCommand(cmd_line_no_bg, "|", _isBackgroundComamnd(cmd_line));
+      else if(cmd_s.find('>') != string::npos) {
+            return new RedirectionCommand(cmd_line_no_bg, ">");
       }
       else if(cmd_s.find("|&") != string::npos) {
-          return new PipeCommand(cmd_line_no_bg, "|&", _isBackgroundComamnd(cmd_line));
+          return new PipeCommand(cmd_line_no_bg, "|&");
+      }
+      else if(cmd_s.find('|') != string::npos) {
+          return new PipeCommand(cmd_line_no_bg, "|");
       }
       else if (cmd_s.find("timeout") == 0) {
             return new TimeoutCommand(cmd_line, args, _isBackgroundComamnd(cmd_line));
-        }
+      }
       else if (cmd_s.find("chprompt") == 0) {
             return new ChangePromptCommand(cmd_line, args);
-        }
+      }
       else if (cmd_s.find("showpid") == 0) {
           return new ShowPidCommand(cmd_line);
       }
@@ -158,7 +159,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
           return new CopyCommand(cmd_line, args);
       }
       else {
-        return new ExternalCommand(cmd_line_no_bg, _isBackgroundComamnd(cmd_line));
+        return new ExternalCommand(cmd_line, cmd_line_no_bg);
       }
 }
 
@@ -270,7 +271,8 @@ void GetCurrDirCommand::execute() {
     free(pwd);
 }
 
-ExternalCommand::ExternalCommand(const char *cmd_line, bool bg) : Command(cmd_line, bg) {
+ExternalCommand::ExternalCommand(const char *cmd_line, char* cmd_line_no_bg) :
+    Command(cmd_line, _isBackgroundComamnd(cmd_line)),cmd_line_no_bg(cmd_line_no_bg)  {
 }
 
 void ExternalCommand::execute() {
@@ -278,7 +280,7 @@ void ExternalCommand::execute() {
      pid_t child_pid= do_fork();
      if(child_pid==0) {
             setpgrp();
-            do_execvp(cmd_line.c_str());
+            do_execvp(cmd_line_no_bg.c_str());
 
      }
      else{
@@ -360,6 +362,7 @@ void JobsList::killAllJobs() {
     removeFinishedJobs();
     cout<<"smash: sending SIGKILL signals to " << list.size() << " jobs:"<<endl;
     for(auto& job : list){
+        cout<< job.pid << ": " << job.cmd->get_cmd_line() << endl;
         job.Kill();
     }
 }
@@ -595,8 +598,8 @@ void KillCommand::execute() {
 
 KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobsList::JobId job_id) :job_id(job_id){}
 
-PipeCommand::PipeCommand(const char *cmd_line_c, string sign, bool bg):
-    Command(cmd_line_c, bg), sign(sign)
+PipeCommand::PipeCommand(const char *cmd_line_c, string sign):
+    Command(cmd_line_c, _isBackgroundComamnd(cmd_line_c)), sign(sign)
 {
     string s_command1, s_command2;
     int sign_index = cmd_line.find(sign);
@@ -651,23 +654,21 @@ void PipeCommand::execute() {
 }
 
 RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
-                                       const string &IO_type,
-                                       bool bg) :
-    Command(cmd_line_c,  bg), IO_type(IO_type){
-    string sign= " "+IO_type+" ";
+                                       const string &IO_type) :
+    Command(cmd_line_c,  _isBackgroundComamnd(cmd_line_c)), IO_type(IO_type){
+    string sign= IO_type;
     int sign_loc=cmd_line.find(sign);
     cmd_left= SmallShell::CreateCommand(cmd_line.substr(0, sign_loc).c_str());
     output_file= cmd_line.substr(sign_loc+sign.size(),  string::npos);
 }
 
 void RedirectionCommand::execute() {
-    int outfd=-1;
     int dest_flags=0;
     if(IO_type==">")
         dest_flags=O_CREAT | O_WRONLY | O_TRUNC;
     else if(IO_type==">>")
         dest_flags= O_CREAT | O_RDWR | O_APPEND;
-    do_open(output_file.c_str(), dest_flags);
+    int outfd=do_open(output_file.c_str(), dest_flags);
     pid_t child_pid= do_fork();
     if(child_pid==0) {
         do_dup2(outfd, STDOUT_FILENO);

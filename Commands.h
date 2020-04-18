@@ -33,8 +33,9 @@ class BuiltInCommand : public Command {
 };
 
 class ExternalCommand : public Command {
+    string cmd_line_no_bg;
  public:
-  explicit ExternalCommand(const char* cmd_line, bool bg);
+    ExternalCommand(const char *cmd_line, char* cmd_line_no_bg);
   ~ExternalCommand() override = default;
   void execute() override;
 };
@@ -44,7 +45,7 @@ class PipeCommand : public Command {
     Command* command2;
     string sign;
 public:
-      explicit PipeCommand(const char* cmd_line_c, string sign, bool bg);
+      explicit PipeCommand(const char* cmd_line_c, string sign);
       ~PipeCommand() override = default;
       void execute() override;
 };
@@ -54,7 +55,7 @@ class RedirectionCommand : public Command {
     string output_file;
     string IO_type;
  public:
-  explicit RedirectionCommand(const char* cmd_line, const string&  IO_type, bool bg);
+  explicit RedirectionCommand(const char* cmd_line, const string&  IO_type);
   ~RedirectionCommand() override = default;
   void execute() override;
   //void prepare() override;
