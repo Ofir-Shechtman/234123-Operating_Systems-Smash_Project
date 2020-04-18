@@ -1,6 +1,6 @@
 #include <unistd.h>
-#include <string.h>
-#include <stdio.h>
+#include <cstring>
+#include <cstdio>
 #include <iostream>
 #include <utility>
 #include <vector>
@@ -125,6 +125,8 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
                   return new PipeCommand(cmd_line_no_bg, args, "|", _isBackgroundComamnd(cmd_line));
               else if(args[i]=="|&")
                   return new PipeCommand(cmd_line_no_bg, args, "|&", _isBackgroundComamnd(cmd_line));
+              else if(cmd_s.find("timeout") == 0)
+                  return new TimeoutCommand(cmd_line, args, _isBackgroundComamnd(cmd_line));
           }
       }
       if (cmd_s.find("chprompt") == 0) {
@@ -665,7 +667,6 @@ void PipeCommand::execute() {
             if(sign == "|") close(1);
             if(sign == "|&") close(2);
             dup(my_pipe[1]);
-            //if (!bg) waitpid(child_pid1, nullptr, WUNTRACED);
             command2->execute();
             throw Quit();
         } else if (bg) {
@@ -680,6 +681,7 @@ void PipeCommand::execute() {
         }
     }
 }
+
 RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
                                        const string &IO_type,
                                        bool bg) :
@@ -693,31 +695,19 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
 void RedirectionCommand::execute() {
     int outfd=-1;
     int dest_flags=0;
-    if(IO_type==">")
-        dest_flags=O_CREAT | O_WRONLY | O_TRUNC;
-    else if(IO_type==">>")
-        dest_flags= O_CREAT | O_RDWR | O_APPEND;
+    if(IO_type==">") dest_flags=O_CREAT | O_WRONLY | O_TRUNC;
+    else if(IO_type==">>") dest_flags= O_CREAT | O_RDWR | O_APPEND;
     mode_t dest_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; /*rw-rw-rw-*/
-    try {
-        outfd = open(output_file.c_str(), dest_flags, dest_perms);
-        if (outfd == -1) {
-            throw RedirectionFailedOpen();//cannot open dest
-        }
-    }
-    catch(RedirectionFailedOpen&) {
-        perror("smash error: open failed");
-    }
-
+    outfd = open(output_file.c_str(), dest_flags, dest_perms);
+    if (outfd == -1) perror("smash error: open failed");
     pid_t child_pid= fork();
-    if(child_pid<0)
-        perror("smash error: fork failed");
+    if(child_pid<0) perror("smash error: fork failed");
     else if(child_pid==0) {
         close(1);
         dup(outfd);
         cmd_left->execute();
         throw Quit();
-        }
-
+    }
     else{
         auto& smash =SmallShell::getInstance();
         if(bg)
@@ -730,4 +720,42 @@ void RedirectionCommand::execute() {
     }
     if (outfd)
         close(outfd);
+}
+
+TimeoutCommand::TimeoutCommand(const char *cmd_line, vector<string> args, bool bg) : Command(cmd_line, bg) {
+    try {
+        timer = stoi(args[1]);
+    }
+    catch (std::invalid_argument const &e) {
+        throw TimerInvalidArgs();
+    }
+    string cmd_s = args[2];
+    for(unsigned i = 3; i<args.size();i++){
+        cmd_s += " " + args[i];
+    }
+    cmd1 = SmallShell::CreateCommand(cmd_s.c_str());
+}
+
+void TimeoutCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    pid_t child_pid= fork();
+    if(child_pid<0) perror("smash error: fork failed");
+    else if(child_pid==0) {
+        setpgrp();
+        cmd1->execute();
+        throw Quit();
+    }
+    else{
+        if(bg){
+            smash.jobs_list.addJob(cmd1,child_pid);
+            alarm(timer);
+        }
+        else{
+            smash.set_fg(child_pid, this);
+            alarm(timer);
+            waitpid(child_pid, nullptr, WUNTRACED);
+            alarm(0);
+            smash.set_fg(0, nullptr);
+        }
+    }
 }

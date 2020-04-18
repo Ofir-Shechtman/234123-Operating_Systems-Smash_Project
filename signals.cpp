@@ -35,6 +35,11 @@ void ctrlCHandler(int sig_num) {
 }
 
 void alarmHandler(int sig_num) {
-  // TODO: Add your implementation
+    cout << "smash: got an alarm"<<endl;
+    auto& smash=SmallShell::getInstance();
+    if(smash.fg_pid) {
+        kill(smash.fg_pid, SIGKILL);
+        cout <<"smash: "<< smash.fg_cmd->get_cmd_line() << " timed out!" <<endl;
+    }
 }
 

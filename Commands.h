@@ -59,8 +59,16 @@ class RedirectionCommand : public Command {
   void execute() override;
   //void prepare() override;
   //void cleanup() override;
-  class RedirectionFailedOpen : public std::exception{};
-  class RedirectionFailedWrite : public std::exception{};
+};
+
+class TimeoutCommand : public Command {
+    int timer;
+    Command* cmd1;
+public:
+    explicit TimeoutCommand(const char* cmd_line, vector<string> args, bool bg);
+    ~TimeoutCommand() override = default;
+    class TimerInvalidArgs: public std::exception{};
+    void execute() override;
 };
 
 class ChangePromptCommand : public BuiltInCommand {
