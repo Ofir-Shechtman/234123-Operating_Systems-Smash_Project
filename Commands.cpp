@@ -311,7 +311,7 @@ void QuitCommand::execute() {
     throw Quit();
 }
 
-JobsList::JobEntry::JobEntry(Command *cmd, pid_t pid_in, JobsList::JobId job_id, bool isStopped) :
+JobsList::JobEntry::JobEntry(Command *cmd, pid_t pid_in, JobsList::JobId job_id, bool isStopped, bool isTimed, int duration) :
     cmd(cmd), pid(pid_in), job_id(job_id), isStopped(isStopped){
 }
 
@@ -322,6 +322,14 @@ std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
     if(job.isStopped)
         os << " (stopped)";
     return os;
+}
+
+JobsList::TimedJobEntry::TimedJobEntry(Command *cmd, pid_t pid, int duration) : cmd(cmd), pid(pid), duration(duration){
+    timestamp = difftime(time(nullptr), cmd->time_in);
+}
+
+JobsList::TimedJobEntry::~TimedJobEntry() {
+    delete cmd;
 }
 
 int JobsList::JobEntry::Kill(int signal) {
@@ -350,9 +358,9 @@ JobsList::JobEntry::~JobEntry() {
     delete cmd;
 }
 
-void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
+void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped, bool isTimed, int duration) {
     removeFinishedJobs();
-    list.emplace_back(cmd, pid,allocJobId(), isStopped);
+    list.emplace_back(cmd, pid,allocJobId(), isStopped, isTimed, duration);
 }
 
 void JobsList::printJobsList() const{
@@ -433,6 +441,24 @@ void JobsList::removeFromStopped(JobId job_id) {
 
 void JobsList::pushToStopped(JobEntry* job) {
     last_stopped_jobs.push_back(job);
+}
+
+JobsList::JobEntry *JobsList::getTimedoutJob() {
+    removeFinishedJobs();
+    for (auto &job : list) {
+        if (job.isTimed && job.duration > difftime(time(nullptr), job.cmd->time_in))
+            return &job;
+    }
+    return nullptr;
+}
+
+void JobsList::addTimedJob(Command *cmd, pid_t pid, int duration) {
+    int i = 0;
+    while(timed_jobs[i]>duration)
+        i++;
+        if(timed_jobs[i].)
+    }
+
 }
 
 JobsCommand::JobsCommand(const char *cmd_line):

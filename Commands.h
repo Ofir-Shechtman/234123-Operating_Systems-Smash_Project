@@ -95,18 +95,16 @@ public:
 
 class ChangeDirCommand : public BuiltInCommand {
     string next_dir;
-// TODO: Add your data members
 public:
     explicit ChangeDirCommand(const char* cmd_line, vector<string>& args);
     class TooManyArgs : public std::exception{};
     class TooFewArgs : public std::exception{};
     class NoOldPWD : public std::exception{};
-    ~ChangeDirCommand() override = default;//TODO: free dirs
+    ~ChangeDirCommand() override = default;
     void execute() override;
 };
 
 
-//class JobsList;
 
 class Quit : public std::exception{};
 
@@ -131,19 +129,33 @@ private:
         pid_t pid;
         JobId job_id;
         bool isStopped;
-        JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped);
+        bool isTimed;
+        int duration;
+        JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped, bool isTimed, int duration);
         int Kill(int signal= SIGKILL);
         bool finish() const;
         ~JobEntry();
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
   };
+    class TimedJobEntry {
+    public:
+        Command* cmd;
+        pid_t pid;
+        int duration;
+        int timestamp;
+        TimedJobEntry(Command* cmd, pid_t pid,int duration);
+        ~TimedJobEntry();
+        friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
+    };
   std::vector<JobEntry> list;
   vector<JobsList::JobEntry*> last_stopped_jobs;
+  vector<JobsList::TimedJobEntry*> timed_jobs;
   JobId allocJobId() const;
 public:
   JobsList()= default;
   ~JobsList()= default;
-  void addJob(Command* cmd, pid_t pid, bool isStopped = false);
+  void addJob(Command* cmd, pid_t pid, bool isStopped = false, bool isTimed = false, int duration = 0);
+  void addTimedJob(Command* cmd, pid_t pid,int duration);
   void printJobsList() const;
   void killAllJobs();
   void removeFinishedJobs();
@@ -152,6 +164,7 @@ public:
   void removeJobById(JobId);
   JobEntry * getLastJob(const JobId* lastJobId);
   JobEntry *getLastStoppedJob();
+  JobEntry *getTimedoutJob();
   void removeFromStopped(JobId);
   void pushToStopped(JobEntry*);
 

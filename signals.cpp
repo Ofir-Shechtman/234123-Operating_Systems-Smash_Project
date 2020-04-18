@@ -37,9 +37,14 @@ void ctrlCHandler(int sig_num) {
 void alarmHandler(int sig_num) {
     cout << "smash: got an alarm"<<endl;
     auto& smash=SmallShell::getInstance();
-    if(smash.fg_pid) {
+    auto job = smash.jobs_list.getTimedoutJob();
+    if((!job) && (smash.fg_pid)) {
         kill(smash.fg_pid, SIGKILL);
         cout <<"smash: "<< smash.fg_cmd->get_cmd_line() << " timed out!" <<endl;
+    }
+    else if(job){
+        job->Kill(SIGKILL);
+        cout <<"smash: "<< job->cmd->get_cmd_line() << " timed out!" <<endl;
     }
 }
 
