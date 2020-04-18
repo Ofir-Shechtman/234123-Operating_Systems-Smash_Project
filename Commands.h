@@ -44,7 +44,7 @@ class PipeCommand : public Command {
     Command* command2;
     string sign;
 public:
-      explicit PipeCommand(const char* cmd_line_c, vector<string> args, string sign, bool bg);
+      explicit PipeCommand(const char* cmd_line_c, string sign, bool bg);
       ~PipeCommand() override = default;
       void execute() override;
 };
@@ -106,9 +106,6 @@ public:
 
 
 //class JobsList;
-
-class Quit : public std::exception{};
-
 
 class QuitCommand : public BuiltInCommand {
     vector<string> args;
