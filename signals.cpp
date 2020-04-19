@@ -44,13 +44,13 @@ void alarmHandler(int sig_num) {
     else if(smash.min_time_job_pid) {
         auto job = smash.jobs_list.getJobByPID(smash.min_time_job_pid);
         if(!job) {
-            smash.set_min_time_job_pid(0);
             smash.jobs_list.removeFinishedTimedjobs();
+            smash.set_min_time_job_pid(0);
             return;
         }
         cout << "smash: got an alarm"<<endl;
         cout <<"smash: timeout "<<job->timer<<" "<< job->cmd->get_cmd_line() << " timed out!" <<endl;
-        smash.jobs_list.removeTimedoutJob(job->job_id);
+        smash.jobs_list.removeTimedoutJob();
     }
 }
 

@@ -437,20 +437,27 @@ void JobsList::pushToStopped(JobEntry* job) {
 
 void JobsList::removeTimedoutJob(JobId job_id) {
     SmallShell& smash = SmallShell::getInstance();
-    if(job_id == -1){
-        do_kill(smash.fg_pid,SIGKILL);
-        smash.set_fg(0,nullptr);
-    }
-    else {
-        auto job = getJobByJobID(job_id);
-        job->Kill(SIGKILL);
-    }
     for (auto job_id_it = timed_jobs.begin(); job_id_it != timed_jobs.end();) {
-        if (*job_id_it == job_id) {
+        if (*job_id_it == -1) {
+            do_kill(smash.fg_pid,SIGKILL);
             timed_jobs.erase(job_id_it);
-            smash.set_min_time_job_pid(0);
+            if(smash.min_time_job_pid == smash.fg_pid) smash.set_min_time_job_pid(0);
+            smash.set_fg(0,nullptr);
+            continue;
         }
-        else {
+        auto job = getJobByJobID(*job_id_it);
+        if(!job){
+            timed_jobs.erase(job_id_it);
+            continue;
+        }
+        if(smash.min_time_job_pid == job->pid) smash.set_min_time_job_pid(0);
+        int time_left = job->timer - difftime(time(nullptr), job->cmd->time_in);
+        if(time_left <= 0){
+            job->Kill(SIGKILL);
+            timed_jobs.erase(job_id_it);
+            if(smash.min_time_job_pid == job->pid) smash.set_min_time_job_pid(0);
+        }
+        else{
             ++job_id_it;
         }
     }

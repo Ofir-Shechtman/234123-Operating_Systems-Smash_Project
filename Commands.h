@@ -154,7 +154,7 @@ public:
   void removeFromStopped(JobId);
 
   void addTimedJob(JobId);
-  void removeTimedoutJob(JobId);
+  void removeTimedoutJob(JobId job_id = 0);
   void removeFinishedTimedjobs(JobId job_id = 0);
   void setAlarmTimer();
 
