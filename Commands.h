@@ -32,9 +32,8 @@ class BuiltInCommand : public Command {
 };
 
 class ExternalCommand : public Command {
-    string cmd_line_no_bg;
  public:
-    ExternalCommand(const char *cmd_line, char* cmd_line_no_bg);
+    ExternalCommand(const char *cmd_line);
   ~ExternalCommand() override = default;
   void execute() override;
 };
@@ -65,7 +64,7 @@ class TimeoutCommand : public Command {
     int timer;
     Command* cmd1;
 public:
-    explicit TimeoutCommand(const char* cmd_line, vector<string> args, bool bg);
+    explicit TimeoutCommand(const char* cmd_line, vector<string> args);
     ~TimeoutCommand() override;
     class TimerInvalidArgs: public std::exception{};
     void execute() override;

@@ -97,6 +97,13 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
+string _remove_bg_sign(string with){
+    char without[with.size()+1];
+    strcpy(without,with.c_str());
+    _removeBackgroundSign(without);
+    return without;
+}
+
 // TODO: Add your implementation for classes in Commands.h
 
 SmallShell::SmallShell() : prompt("smash"), pid(getpid()),
@@ -107,26 +114,24 @@ SmallShell::SmallShell() : prompt("smash"), pid(getpid()),
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
-      char cmd_line_no_bg[strlen(cmd_line)+1];
-      strcpy(cmd_line_no_bg,cmd_line);
-      _removeBackgroundSign(cmd_line_no_bg);
-      vector<string> args=_parseCommandLine(cmd_line_no_bg);
+      const string cmd_line_no_bg = _remove_bg_sign(cmd_line);
+      vector<string> args=_parseCommandLine(cmd_line_no_bg.c_str());
       string cmd_s = string(cmd_line);
 
       if(cmd_s.find(">>") != string::npos) {
-        return new RedirectionCommand(cmd_line_no_bg, ">>");
+        return new RedirectionCommand(cmd_line, ">>");
       }
       else if(cmd_s.find('>') != string::npos) {
-            return new RedirectionCommand(cmd_line_no_bg, ">");
+            return new RedirectionCommand(cmd_line, ">");
       }
       else if(cmd_s.find("|&") != string::npos) {
-          return new PipeCommand(cmd_line_no_bg, "|&");
+          return new PipeCommand(cmd_line, "|&");
       }
       else if(cmd_s.find('|') != string::npos) {
-          return new PipeCommand(cmd_line_no_bg, "|");
+          return new PipeCommand(cmd_line, "|");
       }
       else if (cmd_s.find("timeout") == 0) {
-            return new TimeoutCommand(cmd_line, args, _isBackgroundComamnd(cmd_line));
+            return new TimeoutCommand(cmd_line, args);
       }
       else if (cmd_s.find("chprompt") == 0) {
             return new ChangePromptCommand(cmd_line, args);
@@ -159,7 +164,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
           return new CopyCommand(cmd_line, args);
       }
       else {
-        return new ExternalCommand(cmd_line, cmd_line_no_bg);
+        return new ExternalCommand(cmd_line);
       }
 }
 
@@ -279,12 +284,13 @@ void GetCurrDirCommand::execute() {
     free(pwd);
 }
 
-ExternalCommand::ExternalCommand(const char *cmd_line, char* cmd_line_no_bg) :
-    Command(cmd_line, _isBackgroundComamnd(cmd_line)),cmd_line_no_bg(cmd_line_no_bg)  {
+ExternalCommand::ExternalCommand(const char *cmd_line) :
+    Command(cmd_line, _isBackgroundComamnd(cmd_line))  {
 }
 
 void ExternalCommand::execute() {
      SmallShell& smash= SmallShell::getInstance();
+    const string cmd_line_no_bg = _remove_bg_sign(cmd_line);
      pid_t child_pid= do_fork();
      if(child_pid==0) {
             setpgrp();
@@ -751,8 +757,9 @@ PipeCommand::PipeCommand(const char *cmd_line_c, string sign):
 {
     string s_command1, s_command2;
     int sign_index = cmd_line.find(sign);
-    s_command1 = cmd_line.substr(0,sign_index);
-    s_command2 = cmd_line.substr(sign_index+sign.size()+1,cmd_line.size()-1);
+    string cmd_line_no_bg= _remove_bg_sign(cmd_line);
+    s_command1 = cmd_line_no_bg.substr(0,sign_index);
+    s_command2 = cmd_line_no_bg.substr(sign_index+sign.size(),string::npos);
     command1 = SmallShell::CreateCommand(s_command1.c_str());
     command2 = SmallShell::CreateCommand(s_command2.c_str());
     command1->bg=false;
@@ -807,13 +814,15 @@ PipeCommand::~PipeCommand() {
 
 }
 
+
 RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
                                        const string &IO_type) :
     Command(cmd_line_c,  _isBackgroundComamnd(cmd_line_c)), IO_type(IO_type){
     string sign= IO_type;
-    int sign_loc=cmd_line.find(sign);
-    cmd_left= SmallShell::CreateCommand(cmd_line.substr(0, sign_loc).c_str());
-    output_file= cmd_line.substr(sign_loc+sign.size()+1,  string::npos);
+    string cmd_line_no_bg_str= _remove_bg_sign(cmd_line);
+    int sign_loc=cmd_line_no_bg_str.find(sign);
+    cmd_left= SmallShell::CreateCommand(cmd_line_no_bg_str.substr(0, sign_loc).c_str());
+    output_file= cmd_line_no_bg_str.substr(sign_loc+sign.size()+1,  string::npos);
 }
 
 void RedirectionCommand::execute() {
@@ -847,7 +856,7 @@ RedirectionCommand::~RedirectionCommand() {
 
 }
 
-TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args, bool bg) : Command(cmd_line_in, bg) {
+TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : Command(cmd_line_in, _isBackgroundComamnd(cmd_line_in)) {
     if (args.size()<3)
         throw TimerInvalidArgs();
     try {
@@ -861,11 +870,9 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args, boo
     for(unsigned i = 3; i<args.size();i++){
         cmd_s += " " + args[i];
     }*/
+    string cmd_line_no_bg = _remove_bg_sign(cmd_line);
     string cmd_s = cmd_line.substr(cmd_line.find(args[2]), string::npos);
-    char cmd_line_no_bg[cmd_s.size()+1];
-    strcpy(cmd_line_no_bg,cmd_s.c_str());
-    _removeBackgroundSign(cmd_line_no_bg);
-    cmd1 = SmallShell::CreateCommand(cmd_line_no_bg);
+    cmd1 = SmallShell::CreateCommand(cmd_s.c_str());
 }
 
 void TimeoutCommand::execute() {
