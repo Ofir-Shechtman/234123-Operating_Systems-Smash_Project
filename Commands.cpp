@@ -439,6 +439,8 @@ void JobsList::removeTimedoutJob(JobId job_id) {
     SmallShell& smash = SmallShell::getInstance();
     for (auto job_id_it = timed_jobs.begin(); job_id_it != timed_jobs.end();) {
         if (*job_id_it == -1) {
+            cout << "smash: got an alarm"<<endl;
+            cout <<"smash: "<< smash.fg_cmd->get_cmd_line() << " timed out!" <<endl;
             do_kill(smash.fg_pid,SIGKILL);
             timed_jobs.erase(job_id_it);
             if(smash.min_time_job_pid == smash.fg_pid) smash.set_min_time_job_pid(0);
@@ -453,6 +455,8 @@ void JobsList::removeTimedoutJob(JobId job_id) {
         if(smash.min_time_job_pid == job->pid) smash.set_min_time_job_pid(0);
         int time_left = job->timer - difftime(time(nullptr), job->cmd->time_in);
         if(time_left <= 0){
+            cout << "smash: got an alarm"<<endl;
+            cout <<"smash: timeout "<<job->timer<<" "<< job->cmd->get_cmd_line() << " & timed out!" <<endl;
             job->Kill(SIGKILL);
             timed_jobs.erase(job_id_it);
             if(smash.min_time_job_pid == job->pid) smash.set_min_time_job_pid(0);
@@ -791,6 +795,7 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line, vector<string> args, bool b
         cmd_s += " " + args[i];
     }
     cmd1 = SmallShell::CreateCommand(cmd_s.c_str());
+
 }
 
 void TimeoutCommand::execute() {
