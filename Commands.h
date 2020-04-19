@@ -15,7 +15,6 @@ class Command {
 // TODO: Add your data members
 protected:
   const string cmd_line;
-  const string command;
 public:
   bool bg;
   const time_t time_in;

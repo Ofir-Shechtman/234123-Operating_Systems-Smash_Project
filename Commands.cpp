@@ -259,11 +259,7 @@ void SmallShell::set_min_time_job_pid(pid_t pid) {
 }
 
 Command::Command(const char *cmd_line, bool bg) :
-    cmd_line(cmd_line), command(_parseCommandLine(cmd_line)[0]), bg(bg), time_in(time(nullptr)){
-}
-
-string Command::getCommand() const {
-    return command;
+    cmd_line(cmd_line), bg(bg), time_in(time(nullptr)){
 }
 
 string Command::get_cmd_line() const {
@@ -319,7 +315,7 @@ JobsList::JobEntry::JobEntry(Command *cmd, pid_t pid_in, JobsList::JobId job_id,
 }
 
 std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
-    os << "[" << job.job_id << "]" << " " << job.cmd->getCommand() << " : ";
+    os << "[" << job.job_id << "]" << " " << job.cmd->get_cmd_line() << " : ";
     os << job.pid << " ";
     os << difftime(time(nullptr), job.cmd->time_in) << " secs";
     if(job.isStopped)
@@ -696,7 +692,7 @@ PipeCommand::PipeCommand(const char *cmd_line_c, string sign):
     string s_command1, s_command2;
     int sign_index = cmd_line.find(sign);
     s_command1 = cmd_line.substr(0,sign_index);
-    s_command2 = cmd_line.substr(sign_index+sign.size(),cmd_line.size()-1);
+    s_command2 = cmd_line.substr(sign_index+sign.size()+1,cmd_line.size()-1);
     command1 = SmallShell::CreateCommand(s_command1.c_str());
     command2 = SmallShell::CreateCommand(s_command2.c_str());
     command1->bg=false;
@@ -751,7 +747,7 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
     string sign= IO_type;
     int sign_loc=cmd_line.find(sign);
     cmd_left= SmallShell::CreateCommand(cmd_line.substr(0, sign_loc).c_str());
-    output_file= cmd_line.substr(sign_loc+sign.size(),  string::npos);
+    output_file= cmd_line.substr(sign_loc+sign.size()+1,  string::npos);
 }
 
 void RedirectionCommand::execute() {

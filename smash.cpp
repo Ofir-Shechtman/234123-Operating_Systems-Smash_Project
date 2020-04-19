@@ -25,9 +25,10 @@ int main(int argc, char* argv[]) {
         std::cout<<"\x1B[1;36m"<<smash.get_prompt()<< "> " << "\x1B[0m";
         //std::cout << smash.get_prompt() <<"> ";
         std::string cmd_line;
-        std::getline(std::cin, cmd_line);
+
         try {
-            smash.executeCommand(cmd_line.c_str());
+            do_getline(cmd_line);
+            SmallShell::executeCommand(cmd_line.c_str());
         }
         catch(Continue&){
             continue;
