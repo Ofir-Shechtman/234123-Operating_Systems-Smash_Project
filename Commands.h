@@ -17,7 +17,6 @@ protected:
   const string cmd_line;
 public:
   bool bg;
-  const time_t time_in;
   explicit Command(const char* cmd_line, bool bg);
   virtual ~Command()= default;;
   virtual void execute() = 0;
@@ -46,7 +45,7 @@ class PipeCommand : public Command {
     string sign;
 public:
       explicit PipeCommand(const char* cmd_line_c, string sign);
-      ~PipeCommand() override = default;
+      ~PipeCommand() override;
       void execute() override;
 };
 
@@ -56,7 +55,7 @@ class RedirectionCommand : public Command {
     string IO_type;
  public:
   explicit RedirectionCommand(const char* cmd_line, const string&  IO_type);
-  ~RedirectionCommand() override = default;
+  ~RedirectionCommand() override;
   void execute() override;
   //void prepare() override;
   //void cleanup() override;
@@ -67,7 +66,7 @@ class TimeoutCommand : public Command {
     Command* cmd1;
 public:
     explicit TimeoutCommand(const char* cmd_line, vector<string> args, bool bg);
-    ~TimeoutCommand() override = default;
+    ~TimeoutCommand() override;
     class TimerInvalidArgs: public std::exception{};
     void execute() override;
 };
@@ -115,27 +114,31 @@ public:
   void execute() override;
 
 };
-
+typedef int JobId;
+struct JobEntry {
+    Command* cmd;
+    pid_t pid;
+    JobId job_id;
+    time_t time_in;
+    bool isStopped;
+    bool isDead;
+    int timer;
+    explicit JobEntry(Command* cmd= nullptr, pid_t pid=0, JobId job_id=0, bool isStopped=false, int timer=0);
+    int Kill(int signal= SIGKILL);
+    bool is_finish() ;
+    ~JobEntry()= default;
+    int run_time() const;
+    int time_left() const;
+    void timeout();
+    friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
+};
 
 class JobsList {
 public:
-    typedef int JobId;
 private:
-    class JobEntry {
-      public:
-        Command* cmd;
-        pid_t pid;
-        JobId job_id;
-        bool isStopped;
-        int timer;
-        JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped, int timer);
-        int Kill(int signal= SIGKILL);
-        bool finish() const;
-        ~JobEntry();
-        friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
-  };
+
   std::vector<JobEntry> list;
-  vector<JobsList::JobEntry*> last_stopped_jobs; //TODO: change to job_id
+  vector<JobEntry*> last_stopped_jobs; //TODO: change to job_idS
   vector<JobId> timed_jobs;
   JobId allocJobId() const;
 public:
@@ -147,7 +150,7 @@ public:
   void removeFinishedJobs();
   JobEntry * getJobByPID(pid_t);
   JobEntry * getJobByJobID(JobId);
-  void removeJobById(JobEntry* job);
+  //void removeJobById(JobEntry* job);
   JobEntry * getLastJob(const JobId* lastJobId);
   JobEntry *getLastStoppedJob();
   void pushToStopped(JobEntry*);
@@ -157,6 +160,9 @@ public:
   void removeTimedoutJob(JobId job_id = 0);
   void removeFinishedTimedjobs(JobId job_id = 0);
   void setAlarmTimer();
+
+  void removeTimedoutJobs();
+  void reset_timer(int new_timer=0);
 
   bool empty() const;
   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
@@ -172,15 +178,15 @@ class JobsCommand : public BuiltInCommand {
 };
 
 class KillCommand : public BuiltInCommand {
-    JobsList::JobId job_id;
+    JobId job_id;
     int sig_num;
 public:
     KillCommand(const char *cmdLine1, vector<string> &args);
     ~KillCommand() override = default;
     class KillJobIDDoesntExist: public std::exception{
     public:
-        JobsList::JobId job_id;
-        explicit KillJobIDDoesntExist(JobsList::JobId job_id);
+        JobId job_id;
+        explicit KillJobIDDoesntExist(JobId job_id);
     };
     class KillInvalidArgs: public std::exception{};
     void execute() override;
@@ -193,8 +199,8 @@ class ForegroundCommand : public BuiltInCommand {
     ~ForegroundCommand() override = default;
     class FGJobIDDoesntExist: public std::exception{
     public:
-        JobsList::JobId job_id;
-        explicit FGJobIDDoesntExist(JobsList::JobId job_id);
+        JobId job_id;
+        explicit FGJobIDDoesntExist(JobId job_id);
     };
     class FGEmptyJobsList: public std::exception{};
     class FGInvalidArgs: public std::exception{};
@@ -208,13 +214,13 @@ public:
     ~BackgroundCommand() override = default;
     class BGJobIDDoesntExist: public std::exception{
     public:
-        JobsList::JobId job_id;
-        explicit BGJobIDDoesntExist(JobsList::JobId job_id);
+        JobId job_id;
+        explicit BGJobIDDoesntExist(JobId job_id);
     };
     class BGJobAlreadyRunning: public std::exception{
     public:
-        JobsList::JobId job_id;
-        explicit BGJobAlreadyRunning(JobsList::JobId job_id);
+        JobId job_id;
+        explicit BGJobAlreadyRunning(JobId job_id);
     };
     class BGNoStoppedJobs: public std::exception{};
     class BGInvalidArgs: public std::exception{};
@@ -244,10 +250,11 @@ public:
   string prompt;
   pid_t pid;
   string prev_dir;
-  pid_t min_time_job_pid;
-  int fg_timer;
-  pid_t fg_pid;
-  Command* fg_cmd;
+  //pid_t min_time_job_pid;
+  JobEntry fg_job;
+  //int fg_timer;
+  //pid_t fg_pid;
+  //Command* fg_cmd;
   JobsList jobs_list;
   SmallShell();
  //public:
@@ -267,8 +274,8 @@ public:
   void set_prompt(string input_prompt);
   string get_prev_dir() const;
   void set_prev_dir(string new_dir);
-  void set_fg(pid_t fg_pid, Command* fg_cmd, int timer=0);
-  void set_min_time_job_pid(pid_t pid);
+  void set_fg(pid_t fg_pid=0, Command* fg_cmd=nullptr, int timer=0);
+  //void set_min_time_job_pid(pid_t pid);
   // TODO: add extra methods as needed
 };
 
