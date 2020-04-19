@@ -9,6 +9,7 @@ using std::vector;
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
+#define MAXINT 2147483647
 
 class Command {
 // TODO: Add your data members
@@ -118,7 +119,7 @@ public:
 
 class JobsList {
 public:
-    typedef unsigned int JobId;
+    typedef int JobId;
 private:
     class JobEntry {
       public:
@@ -126,44 +127,36 @@ private:
         pid_t pid;
         JobId job_id;
         bool isStopped;
-        bool isTimed;
-        int duration;
-        JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped, bool isTimed, int duration);
+        int timer;
+        JobEntry(Command* cmd, pid_t pid, JobId job_id, bool isStopped, int timer);
         int Kill(int signal= SIGKILL);
         bool finish() const;
         ~JobEntry();
         friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
   };
-    class TimedJobEntry {
-    public:
-        Command* cmd;
-        pid_t pid;
-        int duration;
-        int timestamp;
-        TimedJobEntry(Command* cmd, pid_t pid,int duration);
-        ~TimedJobEntry();
-        friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
-    };
   std::vector<JobEntry> list;
-  vector<JobsList::JobEntry*> last_stopped_jobs;
-  vector<JobsList::TimedJobEntry*> timed_jobs;
+  vector<JobsList::JobEntry*> last_stopped_jobs; //TODO: change to job_id
+  vector<JobId> timed_jobs;
   JobId allocJobId() const;
 public:
   JobsList()= default;
   ~JobsList()= default;
-  void addJob(Command* cmd, pid_t pid, bool isStopped = false, bool isTimed = false, int duration = 0);
-  void addTimedJob(Command* cmd, pid_t pid,int duration);
+  void addJob(Command* cmd, pid_t pid, bool isStopped = false, int timer = 0);
   void printJobsList() const;
   void killAllJobs();
   void removeFinishedJobs();
   JobEntry * getJobByPID(pid_t);
   JobEntry * getJobByJobID(JobId);
-  void removeJobById(JobId);
+  void removeJobById(JobEntry* job);
   JobEntry * getLastJob(const JobId* lastJobId);
   JobEntry *getLastStoppedJob();
-  JobEntry *getTimedoutJob();
-  void removeFromStopped(JobId);
   void pushToStopped(JobEntry*);
+  void removeFromStopped(JobId);
+
+  void addTimedJob(JobId);
+  void removeTimedoutJob(JobId);
+  void removeFinishedTimedjobs(JobId job_id = 0);
+  void setAlarmTimer();
 
   bool empty() const;
   friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
@@ -251,6 +244,8 @@ public:
   string prompt;
   pid_t pid;
   string prev_dir;
+  pid_t min_time_job_pid;
+  int fg_timer;
   pid_t fg_pid;
   Command* fg_cmd;
   JobsList jobs_list;
@@ -272,7 +267,8 @@ public:
   void set_prompt(string input_prompt);
   string get_prev_dir() const;
   void set_prev_dir(string new_dir);
-  void set_fg(pid_t fg_pid, Command* fg_cmd);
+  void set_fg(pid_t fg_pid, Command* fg_cmd, int timer=0);
+  void set_min_time_job_pid(pid_t pid);
   // TODO: add extra methods as needed
 };
 

@@ -100,7 +100,7 @@ void _removeBackgroundSign(char* cmd_line) {
 // TODO: Add your implementation for classes in Commands.h
 
 SmallShell::SmallShell() : prompt("smash"), pid(getpid()),
-    prev_dir(""), fg_pid(0), fg_cmd(nullptr){
+    prev_dir(""), min_time_job_pid(0),fg_timer(0), fg_pid(0), fg_cmd(nullptr){
 }
 
 /**
@@ -247,9 +247,14 @@ pid_t SmallShell::get_pid() {
     return pid;
 }
 
-void SmallShell::set_fg(pid_t pid_in, Command *cmd) {
+void SmallShell::set_fg(pid_t pid_in, Command *cmd, int timer) {
     fg_pid=pid_in;
     fg_cmd=cmd;
+    fg_timer = timer;
+}
+
+void SmallShell::set_min_time_job_pid(pid_t pid) {
+    min_time_job_pid = pid;
 }
 
 Command::Command(const char *cmd_line, bool bg) :
@@ -307,8 +312,8 @@ void QuitCommand::execute() {
     throw Quit();
 }
 
-JobsList::JobEntry::JobEntry(Command *cmd, pid_t pid_in, JobsList::JobId job_id, bool isStopped, bool isTimed, int duration) :
-    cmd(cmd), pid(pid_in), job_id(job_id), isStopped(isStopped){
+JobsList::JobEntry::JobEntry(Command *cmd, pid_t pid_in, JobsList::JobId job_id, bool isStopped, int timer) :
+    cmd(cmd), pid(pid_in), job_id(job_id), isStopped(isStopped), timer(timer){
 }
 
 std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
@@ -318,14 +323,6 @@ std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
     if(job.isStopped)
         os << " (stopped)";
     return os;
-}
-
-JobsList::TimedJobEntry::TimedJobEntry(Command *cmd, pid_t pid, int duration) : cmd(cmd), pid(pid), duration(duration){
-    timestamp = difftime(time(nullptr), cmd->time_in);
-}
-
-JobsList::TimedJobEntry::~TimedJobEntry() {
-    delete cmd;
 }
 
 int JobsList::JobEntry::Kill(int signal) {
@@ -352,9 +349,9 @@ JobsList::JobEntry::~JobEntry() {
         delete cmd;
 }
 
-void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped, bool isTimed, int duration) {
+void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped, int timer) {
     removeFinishedJobs();
-    list.emplace_back(cmd, pid,allocJobId(), isStopped, isTimed, duration);
+    list.emplace_back(cmd, pid,allocJobId(), isStopped, timer);
 }
 
 void JobsList::printJobsList() const{
@@ -379,7 +376,8 @@ void JobsList::removeFinishedJobs() {
     for(auto job=list.begin(); job!=list.end();){
         if((*job).finish()) {
             list.erase(job);
-        } else
+        }
+        else
             ++job;
     }
 }
@@ -437,22 +435,80 @@ void JobsList::pushToStopped(JobEntry* job) {
     last_stopped_jobs.push_back(job);
 }
 
-JobsList::JobEntry *JobsList::getTimedoutJob() {
-    removeFinishedJobs();
-    for (auto &job : list) {
-        if (job.isTimed && job.duration > difftime(time(nullptr), job.cmd->time_in))
-            return &job;
+void JobsList::removeTimedoutJob(JobId job_id) {
+    SmallShell& smash = SmallShell::getInstance();
+    if(job_id == -1){
+        do_kill(smash.fg_pid,SIGKILL);
+        smash.set_fg(0,nullptr);
     }
-    return nullptr;
+    else {
+        auto job = getJobByJobID(job_id);
+        job->Kill(SIGKILL);
+    }
+    for (auto job_id_it = timed_jobs.begin(); job_id_it != timed_jobs.end();) {
+        if (*job_id_it == job_id) {
+            timed_jobs.erase(job_id_it);
+            smash.set_min_time_job_pid(0);
+        }
+        else {
+            ++job_id_it;
+        }
+    }
+    removeFinishedJobs();
+    setAlarmTimer();
 }
 
-void JobsList::addTimedJob(Command *cmd, pid_t pid, int duration) {
-    int i = 0;
-    while(timed_jobs[i]>duration)
-        i++;
-        if(timed_jobs[i].)
-    }
+void JobsList::addTimedJob(JobId job_id) {
+    timed_jobs.push_back(job_id);
+    setAlarmTimer();
+}
 
+void JobsList::setAlarmTimer() {
+    SmallShell& smash = SmallShell::getInstance();
+    int min_time_left = MAXINT;
+    int time_left = 0;
+    pid_t min_job_pid = 0;
+    for (auto &job_id : timed_jobs) {
+        if(job_id == -1){
+            time_left = smash.fg_timer - difftime(time(nullptr), smash.fg_cmd->time_in);
+            if(time_left < min_time_left) {
+                min_time_left = time_left;
+                min_job_pid = smash.fg_pid;
+            }
+            continue;
+        }
+        auto job = getJobByJobID(job_id);
+        if(!job) continue;
+        time_left = job->timer - difftime(time(nullptr), job->cmd->time_in);
+        if(time_left < min_time_left) {
+            min_time_left = time_left;
+            min_job_pid = job->pid;
+        }
+    }
+    if(min_job_pid>0) {
+        smash.set_min_time_job_pid(min_job_pid);
+        alarm(min_time_left);
+    }
+    else{
+        smash.set_min_time_job_pid(0);
+        alarm(0);
+    }
+}
+
+void JobsList::removeFinishedTimedjobs(JobId job_id) {
+    bool remove_fg_flag = false;
+    if(job_id == -1) remove_fg_flag = true;
+    for (auto job_id_i = timed_jobs.begin(); job_id_i != timed_jobs.end();) {
+        if(*job_id_i == -1){
+            if(remove_fg_flag) timed_jobs.erase(job_id_i);
+            continue;
+        }
+        auto job = getJobByJobID(*job_id_i);
+        if (!job) {
+            timed_jobs.erase(job_id_i);
+        }
+    }
+    setAlarmTimer();
 }
 
 JobsCommand::JobsCommand(const char *cmd_line):
@@ -740,15 +796,17 @@ void TimeoutCommand::execute() {
     }
     else{
         if(bg){
-            smash.jobs_list.addJob(cmd1,child_pid);
-            alarm(timer);
+            smash.jobs_list.addJob(cmd1,child_pid,false,timer);
+            auto job = smash.jobs_list.getJobByPID(child_pid);
+            smash.jobs_list.addTimedJob(job->job_id);
         }
         else{
-            smash.set_fg(child_pid, this);
-            alarm(timer);
+            smash.set_fg(child_pid, this, timer);
+            smash.jobs_list.addTimedJob(-1);
             waitpid(child_pid, nullptr, WUNTRACED);
-            alarm(0);
+            smash.jobs_list.removeFinishedTimedjobs(-1);
             smash.set_fg(0, nullptr);
         }
     }
+    return;
 }
