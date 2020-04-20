@@ -10,28 +10,29 @@ using namespace std;
 void ctrlZHandler(int sig_num) {
     cout << "smash: got ctrl-Z" << endl;
     auto &smash = SmallShell::getInstance();
-    if (smash.fg_job.pid) {
-        kill(smash.fg_job.pid, SIGSTOP);
-        smash.fg_job.cmd->bg = true;
-        auto &job_list = SmallShell::getInstance().jobs_list;
-        auto job = job_list.getJobByPID(smash.fg_job.pid);
-        if (job) { //was before in bg
-            job->isStopped = true;
-        } else {//never was in bg
-            job_list.addJob(smash.fg_job.cmd, smash.fg_job.pid, true);
+    auto &job = smash.fg_job;
+    if (job.pid) {
+        auto job_in_list = smash.jobs_list.getJobByPID(job.pid);
+        if (job_in_list) { //was before in bg
+            job_in_list->Kill(SIGSTOP);
         }
-        cout << "smash: process " << smash.fg_job.pid << " was stopped" << endl;
-        smash.set_fg(0, nullptr);
+        else { //never was in bg
+            job.Kill(SIGSTOP);
+            smash.jobs_list.addJob(job);
+        }
+        cout << "smash: process " << job.pid << " was stopped" << endl;
+        smash.fg_job = JobEntry();
     }
 }
 
 void ctrlCHandler(int sig_num) {
     cout << "smash: got ctrl-C"<<endl;
     auto& smash=SmallShell::getInstance();
-    if(smash.fg_job.pid) {
-        kill(smash.fg_job.pid, SIGKILL);
+    auto &job = smash.fg_job;
+    if(job.pid) {
+        job.Kill(SIGKILL);
         cout << "smash: process " <<smash.fg_job.pid << " was killed" <<endl;
-        smash.set_fg(0, nullptr);
+        smash.fg_job = JobEntry();
     }
 }
 

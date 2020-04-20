@@ -116,12 +116,12 @@ typedef int JobId;
 struct JobEntry {
     Command* cmd;
     pid_t pid;
+    int timer;
     JobId job_id;
     time_t time_in;
     bool isStopped;
     bool isDead;
-    int timer;
-    explicit JobEntry(Command* cmd= nullptr, pid_t pid=0, JobId job_id=0, bool isStopped=false, int timer=0);
+    explicit JobEntry(Command* cmd= nullptr, pid_t pid=0, int timer=0);
     int Kill(int signal= SIGKILL);
     bool is_finish() ;
     ~JobEntry()= default;
@@ -136,22 +136,22 @@ public:
 private:
 
   std::vector<JobEntry> list;
-  vector<JobEntry*> last_stopped_jobs; //TODO: change to job_idS
+  vector<JobId> last_stopped_jobs;
   vector<JobId> timed_jobs;
   JobId allocJobId() const;
 public:
   JobsList()= default;
   ~JobsList()= default;
-  void addJob(Command* cmd, pid_t pid, bool isStopped = false, int timer = 0);
+  void addJob(JobEntry);
   void printJobsList() const;
   void killAllJobs();
   void removeFinishedJobs();
   JobEntry * getJobByPID(pid_t);
   JobEntry * getJobByJobID(JobId);
-  //void removeJobById(JobEntry* job);
+  //void removeJobById(JobId);
   JobEntry * getLastJob(const JobId* lastJobId);
   JobEntry *getLastStoppedJob();
-  void pushToStopped(JobEntry*);
+  void pushToStopped(JobId);
   void removeFromStopped(JobId);
 
   void addTimedJob(JobId);
@@ -272,7 +272,6 @@ public:
   void set_prompt(string input_prompt);
   string get_prev_dir() const;
   void set_prev_dir(string new_dir);
-  void set_fg(pid_t fg_pid=0, Command* fg_cmd=nullptr, int timer=0);
   //void set_min_time_job_pid(pid_t pid);
   // TODO: add extra methods as needed
 };
