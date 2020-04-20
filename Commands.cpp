@@ -169,13 +169,12 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-   if(string(cmd_line).empty())
-        return;
-
    Command* cmd= nullptr;
    try {
         cmd = CreateCommand(cmd_line);
         cmd->execute();
+        if(!cmd->bg)
+            delete cmd;
    }
    catch(Quit& quit) {
        delete cmd;
@@ -256,7 +255,7 @@ void SmallShell::replace_fg_and_wait(JobEntry job) {
     delete fg_job.cmd;
     fg_job = JobEntry(job);
     waitpid(fg_job.pid, nullptr, WUNTRACED);
-    fg_job = JobEntry();
+    fg_job.pid=0;
 
 }
 
@@ -313,10 +312,12 @@ QuitCommand::QuitCommand(const char *cmd_line, vector<string>& args)
 }
 
 void QuitCommand::execute() {
-    auto& jobs_list=SmallShell::getInstance().jobs_list;
+    auto& smash =SmallShell::getInstance();
+    auto& jobs_list=smash.jobs_list;
     if(args.size()>1 && args[1]=="kill")
         jobs_list.killAllJobs();
-    jobs_list.removeFinishedJobs();
+    jobs_list.deleteAll();
+    delete smash.fg_job.cmd;
     throw Quit();
 }
 
@@ -363,8 +364,8 @@ bool JobEntry::is_finish()  {
     if(!isDead) {
         pid_t res=waitpid(pid, nullptr, WNOHANG);
         isDead = res == pid || res==-1;
-        //if (isDead)
-        //    delete cmd;
+        if (isDead)
+            delete cmd;
     }
     return  isDead;//|| return_pid==-1;
 }
@@ -411,8 +412,9 @@ void JobsList::killAllJobs() {
 
 void JobsList::removeFinishedJobs() {
     for(auto job=list.begin(); job!=list.end();){
-        if((*job).is_finish()) {
-            remove(job);
+        if(job->is_finish()) {
+            delete job->cmd;
+            list.erase(job);
         }
         else
             ++job;
@@ -475,15 +477,12 @@ void JobsList::pushToStopped(JobId job_id) {
 
 void JobsList::removeTimedoutJobs(){
     removeFinishedJobs();
-    for (auto it = list.begin(); it != list.end();) {
-        auto &job = *it;
+    for (auto & job : list) {
         //cout<<"LIST: run time: "<<job.run_time()<<" timer:"<<job.timer <<endl;
-        if (job.timer && job.run_time() >= job.timer) {
+        if (job.timer && job.run_time() >= job.timer)
             job.timeout();
-            remove(it);
-        } else
-            ++it;
     }
+    removeFinishedJobs();
 
     JobEntry &fg_job = SmallShell::getInstance().fg_job;
     //cout<<"run time: "<<fg_job.run_time()<<" timer:"<<fg_job.timer <<" if"<<(fg_job.cmd!=nullptr) << fg_job.timer << (fg_job.run_time() >= fg_job.timer) <<endl;
@@ -602,10 +601,7 @@ void JobsList::reset_timer(int new_timer) {
 
 }
 
-void JobsList::remove(vector<JobEntry>::iterator it) {
-    delete (*it).cmd;
-    list.erase(it);
-}
+
 
 JobsCommand::JobsCommand(const char *cmd_line):
     BuiltInCommand(cmd_line){}
@@ -932,3 +928,7 @@ TimeoutCommand::~TimeoutCommand() {
 
 }
 
+void JobsList::deleteAll() {
+    for(auto job:list)
+        delete job.cmd;
+}

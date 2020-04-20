@@ -150,6 +150,7 @@ public:
   void printJobsList() const;
   void killAllJobs();
   void removeFinishedJobs();
+  void deleteAll();
   JobEntry * getJobByPID(pid_t);
   JobEntry * getJobByJobID(JobId);
   //void removeJobById(JobId);
