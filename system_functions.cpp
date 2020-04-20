@@ -96,12 +96,3 @@ void do_chdir(const char *path) {
     }
 
 }
-void do_getline(std::string& cmd_line){
-    try {
-        std::getline(std::cin, cmd_line);
-    }
-    catch(Continue& c){
-        throw c;
-    }
-
-}

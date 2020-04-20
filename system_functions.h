@@ -21,7 +21,6 @@ int  do_kill(pid_t pid, int signal);
 void do_chdir(const char* path);
 void do_pipe(int* fds);
 void do_dup2(int fd, int fd_replace);
-void do_getline(std::string& cmd_line);
 
 
 #endif //SMASH_SYSTEM_FUNCS_H

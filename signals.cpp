@@ -8,8 +8,13 @@
 using namespace std;
 
 void ctrlZHandler(int sig_num) {
-    cout << "smash: got ctrl-Z" << endl;
     auto &smash = SmallShell::getInstance();
+    if(smash.pid!=getpid()){
+       // do_kill(getpid(), SIGSTOP);
+        return;
+    }
+    cout << "smash: got ctrl-Z" << endl;
+
     auto &job = smash.fg_job;
     if (job.pid) {
         auto job_in_list = smash.jobs_list.getJobByPID(job.pid);
@@ -27,8 +32,12 @@ void ctrlZHandler(int sig_num) {
 }
 
 void ctrlCHandler(int sig_num) {
+    auto &smash = SmallShell::getInstance();
+    if (smash.pid != getpid()) {
+        do_kill(getpid(), SIGKILL);
+        return;
+    }
     cout << "smash: got ctrl-C"<<endl;
-    auto& smash=SmallShell::getInstance();
     auto &job = smash.fg_job;
     if(job.pid) {
         job.Kill(SIGKILL);
@@ -39,6 +48,8 @@ void ctrlCHandler(int sig_num) {
 
 void alarmHandler(int sig_num) {
     auto& smash=SmallShell::getInstance();
+    if(smash.pid!=getpid())
+        return;
     smash.jobs_list.removeTimedoutJobs();
     smash.jobs_list.reset_timer();
     /*

@@ -11,6 +11,8 @@ using std::vector;
 #define HISTORY_MAX_RECORDS (50)
 #define MAXINT 2147483647
 
+
+
 class Command {
 // TODO: Add your data members
 protected:
@@ -20,8 +22,27 @@ public:
   explicit Command(const char* cmd_line, bool bg);
   virtual ~Command()= default;;
   virtual void execute() = 0;
-  string getCommand() const;
+  //string getCommand() const;
   string get_cmd_line() const;
+};
+
+typedef int JobId;
+struct JobEntry {
+    Command* cmd;
+    pid_t pid;
+    int timer;
+    JobId job_id;
+    time_t time_in;
+    bool isStopped;
+    bool isDead;
+    explicit JobEntry(Command* cmd= nullptr, pid_t pid=0, int timer=0);
+    int Kill(int signal= SIGKILL);
+    bool is_finish();
+    ~JobEntry()= default;
+    int run_time() const;
+    int time_left() const;
+    void timeout();
+    friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
 };
 
 class BuiltInCommand : public Command {
@@ -32,10 +53,12 @@ class BuiltInCommand : public Command {
 
 class ExternalCommand : public Command {
  public:
-    ExternalCommand(const char *cmd_line);
+    explicit ExternalCommand(const char *cmd_line);
   ~ExternalCommand() override = default;
   void execute() override;
 };
+
+
 
 class PipeCommand : public Command {
     Command* command1;
@@ -55,8 +78,6 @@ class RedirectionCommand : public Command {
   explicit RedirectionCommand(const char* cmd_line, const string&  IO_type);
   ~RedirectionCommand() override;
   void execute() override;
-  //void prepare() override;
-  //void cleanup() override;
 };
 
 class TimeoutCommand : public Command {
@@ -112,24 +133,7 @@ public:
   void execute() override;
 
 };
-typedef int JobId;
-struct JobEntry {
-    Command* cmd;
-    pid_t pid;
-    int timer;
-    JobId job_id;
-    time_t time_in;
-    bool isStopped;
-    bool isDead;
-    explicit JobEntry(Command* cmd= nullptr, pid_t pid=0, int timer=0);
-    int Kill(int signal= SIGKILL);
-    bool is_finish() ;
-    ~JobEntry()= default;
-    int run_time() const;
-    int time_left() const;
-    void timeout();
-    friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
-};
+
 
 class JobsList {
 public:
@@ -153,11 +157,12 @@ public:
   JobEntry *getLastStoppedJob();
   void pushToStopped(JobId);
   void removeFromStopped(JobId);
-
+  void remove(vector<JobEntry>::iterator it);
+/*
   void addTimedJob(JobId);
   void removeTimedoutJob(JobId job_id = 0);
   void removeFinishedTimedjobs(JobId job_id = 0);
-  void setAlarmTimer();
+  void setAlarmTimer();*/
 
   void removeTimedoutJobs();
   void reset_timer(int new_timer=0);
@@ -266,12 +271,13 @@ public:
     return instance;
   }
   ~SmallShell()= default;
-  static void executeCommand(const char* cmd_line);
+  void executeCommand(const char* cmd_line);
   string get_prompt() const;
   pid_t get_pid();
   void set_prompt(string input_prompt);
   string get_prev_dir() const;
   void set_prev_dir(string new_dir);
+  void replace_fg_and_wait(JobEntry job);
   //void set_min_time_job_pid(pid_t pid);
   // TODO: add extra methods as needed
 };

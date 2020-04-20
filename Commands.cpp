@@ -176,8 +176,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
    try {
         cmd = CreateCommand(cmd_line);
         cmd->execute();
-        if(!cmd->bg)
-            delete cmd;
    }
    catch(Quit& quit) {
        delete cmd;
@@ -253,6 +251,16 @@ pid_t SmallShell::get_pid() {
     return pid;
 }
 
+void SmallShell::replace_fg_and_wait(JobEntry job) {
+    auto& fg_job = SmallShell().getInstance().fg_job;
+    delete fg_job.cmd;
+    fg_job = JobEntry(job);
+    waitpid(fg_job.pid, nullptr, WUNTRACED);
+    fg_job = JobEntry();
+
+}
+
+
 /*
 void SmallShell::set_min_time_job_pid(pid_t pid) {
     min_time_job_pid = pid;
@@ -291,11 +299,9 @@ void ExternalCommand::execute() {
      }
      else{
          if(bg)
-             SmallShell::getInstance().jobs_list.addJob(JobEntry(this, child_pid));
+             smash.jobs_list.addJob(JobEntry(this, child_pid));
          else{
-             smash.fg_job = JobEntry(this, child_pid);
-             waitpid(child_pid, nullptr, WUNTRACED);
-             smash.fg_job = JobEntry();
+             smash.replace_fg_and_wait(JobEntry(this, child_pid));
          }
      }
 }
@@ -307,8 +313,10 @@ QuitCommand::QuitCommand(const char *cmd_line, vector<string>& args)
 }
 
 void QuitCommand::execute() {
+    auto& jobs_list=SmallShell::getInstance().jobs_list;
     if(args.size()>1 && args[1]=="kill")
-        SmallShell::getInstance().jobs_list.killAllJobs();
+        jobs_list.killAllJobs();
+    jobs_list.removeFinishedJobs();
     throw Quit();
 }
 
@@ -353,9 +361,10 @@ int JobEntry::Kill(int signal)  {
 
 bool JobEntry::is_finish()  {
     if(!isDead) {
-        isDead = waitpid(pid, nullptr, WNOHANG) == pid;
-        if (isDead)
-            delete cmd;
+        pid_t res=waitpid(pid, nullptr, WNOHANG);
+        isDead = res == pid || res==-1;
+        //if (isDead)
+        //    delete cmd;
     }
     return  isDead;//|| return_pid==-1;
 }
@@ -378,7 +387,7 @@ void JobEntry::timeout() {
 void JobsList::addJob(JobEntry job) {
     removeFinishedJobs();
     job.job_id = allocJobId();
-    list.emplace_back(job);
+    list.push_back(job);
 }
 
 void JobsList::printJobsList() const{
@@ -403,7 +412,7 @@ void JobsList::killAllJobs() {
 void JobsList::removeFinishedJobs() {
     for(auto job=list.begin(); job!=list.end();){
         if((*job).is_finish()) {
-            list.erase(job);
+            remove(job);
         }
         else
             ++job;
@@ -471,7 +480,7 @@ void JobsList::removeTimedoutJobs(){
         //cout<<"LIST: run time: "<<job.run_time()<<" timer:"<<job.timer <<endl;
         if (job.timer && job.run_time() >= job.timer) {
             job.timeout();
-            list.erase(it);
+            remove(it);
         } else
             ++it;
     }
@@ -593,6 +602,11 @@ void JobsList::reset_timer(int new_timer) {
 
 }
 
+void JobsList::remove(vector<JobEntry>::iterator it) {
+    delete (*it).cmd;
+    list.erase(it);
+}
+
 JobsCommand::JobsCommand(const char *cmd_line):
     BuiltInCommand(cmd_line){}
 
@@ -659,9 +673,7 @@ void ForegroundCommand::execute() {
     job->cmd->bg=false;
     cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
     auto& smash=SmallShell::getInstance();
-    smash.fg_job = JobEntry(job->cmd, job->pid);
-    waitpid(job->pid, nullptr, WUNTRACED);
-    smash.fg_job = JobEntry();
+    smash.replace_fg_and_wait(JobEntry(job->cmd, job->pid));
 }
 
 BackgroundCommand::BackgroundCommand(const char *cmd_line, vector<string> &args):
@@ -735,9 +747,7 @@ void CopyCommand::execute() {
         if(bg)
             SmallShell::getInstance().jobs_list.addJob(JobEntry(this, child_pid));
         else{
-            smash.fg_job = JobEntry(this, child_pid);
-            waitpid(child_pid, nullptr, WUNTRACED);
-            smash.fg_job = JobEntry();
+            smash.replace_fg_and_wait(JobEntry(this, child_pid));
         }
     }
 }
@@ -780,11 +790,12 @@ void PipeCommand::execute() {
     SmallShell &smash = SmallShell::getInstance();
     pid_t pipe_pid = do_fork();
     if (pipe_pid == 0) {
+        //setpgrp();
         int pipefd[2];
         do_pipe(pipefd);
         pid_t child_pid1 = do_fork();
         if (child_pid1 == 0) {
-            setpgrp();
+            //setpgrp();
             int fd = sign == "|" ? STDOUT_FILENO : STDERR_FILENO;
             do_dup2(pipefd[1], fd);
             do_close(pipefd[1]);
@@ -794,7 +805,7 @@ void PipeCommand::execute() {
         } else {
             pid_t child_pid2 = do_fork();
             if (child_pid2 == 0) {
-                setpgrp();
+                //setpgrp();
                 do_dup2(pipefd[0], STDIN_FILENO);
                 do_close(pipefd[0]);
                 do_close(pipefd[1]);
@@ -805,21 +816,16 @@ void PipeCommand::execute() {
                 do_close(pipefd[0]);
                 do_close(pipefd[1]);
             }
-
-
-            if (!bg) {
-                waitpid(child_pid1, nullptr, WUNTRACED);
-                waitpid(child_pid2, nullptr, WUNTRACED);
-            }
+            waitpid(child_pid1, nullptr, WUNTRACED);
+            waitpid(child_pid2, nullptr, WUNTRACED);
             throw Quit();
         }
     }
+
     if (bg) {
         smash.jobs_list.addJob(JobEntry(this, pipe_pid));
     } else {
-        smash.fg_job = JobEntry(this, pipe_pid);
-        waitpid(pipe_pid, nullptr, WUNTRACED);
-        smash.fg_job = JobEntry();
+        smash.replace_fg_and_wait(JobEntry(this, pipe_pid));
     }
 }
 
@@ -836,7 +842,8 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
     string sign= IO_type;
     string cmd_line_no_bg_str= _remove_bg_sign(cmd_line);
     int sign_loc=cmd_line_no_bg_str.find(sign);
-    cmd_left= SmallShell::CreateCommand(cmd_line_no_bg_str.substr(0, sign_loc).c_str());
+    string cmd_left_line=cmd_line_no_bg_str.substr(0, sign_loc);
+    cmd_left= SmallShell::CreateCommand(cmd_left_line.c_str());
     output_file= cmd_line_no_bg_str.substr(sign_loc+sign.size()+1,  string::npos);
 }
 
@@ -847,20 +854,28 @@ void RedirectionCommand::execute() {
     else if(IO_type==">>")
         dest_flags= O_CREAT | O_RDWR | O_APPEND;
     int outfd=do_open(output_file.c_str(), dest_flags);
-    pid_t child_pid= do_fork();
-    if(child_pid==0) {
-        do_dup2(outfd, STDOUT_FILENO);
-        cmd_left->execute();
-        throw Quit();
+    pid_t redir_pid= do_fork();
+    if(redir_pid==0) {
+        setpgrp();
+        pid_t child_pid = do_fork();
+        if (child_pid == 0) {
+            //setpgrp();
+            do_dup2(outfd, STDOUT_FILENO);
+            cmd_left->execute();
+            throw Quit();
+        }
+        else{
+            waitpid(child_pid, nullptr, WUNTRACED);
+            throw Quit();
+        }
     }
     else{
         auto& smash =SmallShell::getInstance();
         if(bg)
-            smash.jobs_list.addJob(JobEntry(this, child_pid));
+            smash.jobs_list.addJob(JobEntry(this, redir_pid));
         else{
-            smash.fg_job = JobEntry(this, child_pid);
-            waitpid(child_pid, nullptr, WUNTRACED);
-            smash.fg_job = JobEntry();
+            smash.replace_fg_and_wait(JobEntry(this, redir_pid));
+
         }
     }
     do_close(outfd);
@@ -870,6 +885,7 @@ RedirectionCommand::~RedirectionCommand() {
     delete cmd_left;
 
 }
+
 
 TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : Command(cmd_line_in, _isBackgroundComamnd(cmd_line_in)) {
     if (args.size()<3)
@@ -906,11 +922,7 @@ void TimeoutCommand::execute() {
             //smash.jobs_list.addTimedJob(job->job_id);
         }
         else{
-            smash.fg_job = JobEntry(this,child_pid,timer);
-
-            waitpid(child_pid, nullptr, WUNTRACED);
-            //smash.jobs_list.removeFinishedTimedjobs(-1);
-            smash.fg_job = JobEntry();
+            smash.replace_fg_and_wait(JobEntry(this,child_pid,timer));
         }
     }
 }
@@ -919,3 +931,4 @@ TimeoutCommand::~TimeoutCommand() {
     delete cmd1;
 
 }
+
