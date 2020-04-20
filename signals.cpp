@@ -17,8 +17,9 @@ void ctrlZHandler(int sig_num) {
             job_in_list->Kill(SIGSTOP);
         }
         else { //never was in bg
-            job.Kill(SIGSTOP);
             smash.jobs_list.addJob(job);
+            auto job_added = smash.jobs_list.getJobByPID(job.pid);
+            job_added->Kill(SIGSTOP);
         }
         cout << "smash: process " << job.pid << " was stopped" << endl;
         smash.fg_job = JobEntry();

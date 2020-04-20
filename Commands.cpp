@@ -668,7 +668,6 @@ BackgroundCommand::BackgroundCommand(const char *cmd_line, vector<string> &args)
         BuiltInCommand(cmd_line), args(args){}
 
 BackgroundCommand::BGJobIDDoesntExist::BGJobIDDoesntExist(JobId job_id): job_id(job_id){}
-
 BackgroundCommand::BGJobAlreadyRunning::BGJobAlreadyRunning(JobId job_id): job_id(job_id){}
 
 void BackgroundCommand::execute() {
