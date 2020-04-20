@@ -480,7 +480,7 @@ void JobsList::removeTimedoutJobs(){
     }
 
     JobEntry& fg_job = SmallShell::getInstance().fg_job;
-    //cout<<"run time: "<<fg_job.run_time()<<" timer:"<<fg_job.timer <<endl;
+    //cout<<"run time: "<<fg_job.run_time()<<" timer:"<<fg_job.timer <<" if"<<(fg_job.cmd!=nullptr) << fg_job.timer << (fg_job.run_time() >= fg_job.timer) <<endl;
     if(fg_job.cmd && fg_job.timer && fg_job.run_time() >= fg_job.timer)
         fg_job.timeout();
 }
@@ -576,6 +576,10 @@ void JobsList::reset_timer(int new_timer) {
             timer=job.time_left();
         }
     }
+    auto& fg_job = SmallShell::getInstance().fg_job;
+    if(fg_job.timer && (!timer || fg_job.time_left()<timer))
+        timer=fg_job.time_left();
+
     if(new_timer && (!timer || new_timer<timer))
         timer=new_timer;
     if(timer)
@@ -768,44 +772,49 @@ PipeCommand::PipeCommand(const char *cmd_line_c, string sign):
 }
 
 void PipeCommand::execute() {
-    SmallShell& smash = SmallShell::getInstance();
-    int pipefd[2];
-    do_pipe(pipefd);
-    pid_t child_pid1= do_fork();
-    if(child_pid1==0) {
-        setpgrp();
-        int fd = sign == "|" ? STDOUT_FILENO : STDERR_FILENO;
-        do_dup2(pipefd[1],fd);
-        do_close(pipefd[1]);
-        do_close(pipefd[0]);
-        command1->execute();
-        throw Quit();
-    } else {
-        pid_t child_pid2 = do_fork();
-        if (child_pid2 == 0) {
+    SmallShell &smash = SmallShell::getInstance();
+    pid_t pipe_pid = do_fork();
+    if (pipe_pid == 0) {
+        int pipefd[2];
+        do_pipe(pipefd);
+        pid_t child_pid1 = do_fork();
+        if (child_pid1 == 0) {
             setpgrp();
-            do_dup2(pipefd[0], STDIN_FILENO);
-            do_close(pipefd[0]);
+            int fd = sign == "|" ? STDOUT_FILENO : STDERR_FILENO;
+            do_dup2(pipefd[1], fd);
             do_close(pipefd[1]);
-            waitpid(child_pid1, nullptr, WUNTRACED);
-            command2->execute();
+            do_close(pipefd[0]);
+            command1->execute();
+            throw Quit();
+        } else {
+            pid_t child_pid2 = do_fork();
+            if (child_pid2 == 0) {
+                setpgrp();
+                do_dup2(pipefd[0], STDIN_FILENO);
+                do_close(pipefd[0]);
+                do_close(pipefd[1]);
+                waitpid(child_pid1, nullptr, WUNTRACED);
+                command2->execute();
+                throw Quit();
+            } else {
+                do_close(pipefd[0]);
+                do_close(pipefd[1]);
+            }
+
+
+            if (!bg) {
+                waitpid(child_pid1, nullptr, WUNTRACED);
+                waitpid(child_pid2, nullptr, WUNTRACED);
+            }
             throw Quit();
         }
-        else {
-            do_close(pipefd[0]);
-            do_close(pipefd[1]);
-            if (bg) {
-                smash.jobs_list.addJob(this, child_pid1);
-                smash.jobs_list.addJob(command2, child_pid2);
-            } else {
-                smash.set_fg(child_pid1, this);
-                waitpid(child_pid1, nullptr, WUNTRACED);
-                smash.set_fg(child_pid2, this);
-                waitpid(child_pid2, nullptr, WUNTRACED);
-                smash.set_fg(0, nullptr);
-            }
-        }
-
+    }
+    if (bg) {
+        smash.jobs_list.addJob(this, pipe_pid);
+    } else {
+        smash.set_fg(pipe_pid, this);
+        waitpid(pipe_pid, nullptr, WUNTRACED);
+        smash.set_fg(0, nullptr);
     }
 }
 
@@ -872,7 +881,7 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : C
         cmd_s += " " + args[i];
     }*/
     string cmd_line_no_bg = _remove_bg_sign(cmd_line);
-    string cmd_s = cmd_line.substr(cmd_line.find(args[2]), string::npos);
+    string cmd_s = cmd_line_no_bg.substr(cmd_line_no_bg.find(args[2]), string::npos);
     cmd1 = SmallShell::CreateCommand(cmd_s.c_str());
 }
 
@@ -887,7 +896,7 @@ void TimeoutCommand::execute() {
     else{
         smash.jobs_list.reset_timer(timer);
         if(bg){
-            smash.jobs_list.addJob(cmd1,child_pid,false,timer);
+            smash.jobs_list.addJob(this,child_pid,false,timer);
             //auto job = smash.jobs_list.getJobByPID(child_pid);
             //smash.jobs_list.addTimedJob(job->job_id);
         }
