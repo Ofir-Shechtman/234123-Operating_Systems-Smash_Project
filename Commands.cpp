@@ -619,9 +619,10 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string>& args) :
 
 void ChangeDirCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
-    string prev_dir = get_current_dir_name();
+    char* prev_dir = get_current_dir_name();
     do_chdir(next_dir.c_str());
     smash.set_prev_dir(prev_dir);
+    free(prev_dir);
 }
 
 ForegroundCommand::ForegroundCommand(const char *cmd_line, vector<string>& args) :
@@ -794,7 +795,7 @@ void PipeCommand::execute() {
             do_close(pipefd[0]);
             do_close(pipefd[1]);
             if (bg) {
-                smash.jobs_list.addJob(command1, child_pid1);
+                smash.jobs_list.addJob(this, child_pid1);
                 smash.jobs_list.addJob(command2, child_pid2);
             } else {
                 smash.set_fg(child_pid1, this);
