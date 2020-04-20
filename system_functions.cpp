@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <istream>
 #include "system_functions.h"
 
 
@@ -83,7 +84,7 @@ int do_kill(pid_t pid, int signal) {
     int res=kill(pid, signal);
     if(res!=0) {
         do_perror("kill");
-        throw Continue();
+        //throw Continue();
     }
     return res;
 }
@@ -95,4 +96,12 @@ void do_chdir(const char *path) {
     }
 
 }
+void do_getline(std::string& cmd_line){
+    try {
+        std::getline(std::cin, cmd_line);
+    }
+    catch(Continue& c){
+        throw c;
+    }
 
+}

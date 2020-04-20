@@ -97,39 +97,45 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
+string _remove_bg_sign(string with){
+    char without[with.size()+1];
+    strcpy(without,with.c_str());
+    _removeBackgroundSign(without);
+    return without;
+}
+
 // TODO: Add your implementation for classes in Commands.h
 
 SmallShell::SmallShell() : prompt("smash"), pid(getpid()),
-    prev_dir(""), min_time_job_pid(0),fg_timer(0), fg_pid(0), fg_cmd(nullptr){
+    prev_dir(""), fg_job(JobEntry()){
 }
 
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
-      char cmd_line_no_bg[strlen(cmd_line)+1];
-      strcpy(cmd_line_no_bg,cmd_line);
-      _removeBackgroundSign(cmd_line_no_bg);
-      vector<string> args=_parseCommandLine(cmd_line_no_bg);
+      const string cmd_line_no_bg = _remove_bg_sign(cmd_line);
+      vector<string> args=_parseCommandLine(cmd_line_no_bg.c_str());
       string cmd_s = string(cmd_line);
-      if(cmd_s.find('>') != string::npos) {
-            return new RedirectionCommand(cmd_line_no_bg, ">", _isBackgroundComamnd(cmd_line));
+
+      if(cmd_s.find(">>") != string::npos) {
+        return new RedirectionCommand(cmd_line, ">>");
       }
-      else if(cmd_s.find(">>") != string::npos) {
-          return new RedirectionCommand(cmd_line_no_bg, ">>", _isBackgroundComamnd(cmd_line));
-      }
-      else if(cmd_s.find('|') != string::npos) {
-          return new PipeCommand(cmd_line_no_bg, "|", _isBackgroundComamnd(cmd_line));
+      else if(cmd_s.find('>') != string::npos) {
+            return new RedirectionCommand(cmd_line, ">");
       }
       else if(cmd_s.find("|&") != string::npos) {
-          return new PipeCommand(cmd_line_no_bg, "|&", _isBackgroundComamnd(cmd_line));
+          return new PipeCommand(cmd_line, "|&");
+      }
+      else if(cmd_s.find('|') != string::npos) {
+          return new PipeCommand(cmd_line, "|");
       }
       else if (cmd_s.find("timeout") == 0) {
-            return new TimeoutCommand(cmd_line, args, _isBackgroundComamnd(cmd_line));
-        }
+            return new TimeoutCommand(cmd_line, args);
+      }
       else if (cmd_s.find("chprompt") == 0) {
             return new ChangePromptCommand(cmd_line, args);
-        }
+      }
       else if (cmd_s.find("showpid") == 0) {
           return new ShowPidCommand(cmd_line);
       }
@@ -158,7 +164,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
           return new CopyCommand(cmd_line, args);
       }
       else {
-        return new ExternalCommand(cmd_line_no_bg, _isBackgroundComamnd(cmd_line));
+        return new ExternalCommand(cmd_line);
       }
 }
 
@@ -247,22 +253,22 @@ pid_t SmallShell::get_pid() {
     return pid;
 }
 
+
 void SmallShell::set_fg(pid_t pid_in, Command *cmd, int timer) {
-    fg_pid=pid_in;
-    fg_cmd=cmd;
-    fg_timer = timer;
+    fg_job=JobEntry(cmd, pid_in, 0, false, timer);
+    //fg_pid=pid_in;
+    //fg_cmd=cmd;
+    //fg_timer = timer;
 }
 
+/*
 void SmallShell::set_min_time_job_pid(pid_t pid) {
     min_time_job_pid = pid;
 }
+ */
 
 Command::Command(const char *cmd_line, bool bg) :
-    cmd_line(cmd_line), command(_parseCommandLine(cmd_line)[0]), bg(bg), time_in(time(nullptr)){
-}
-
-string Command::getCommand() const {
-    return command;
+    cmd_line(cmd_line), bg(bg){
 }
 
 string Command::get_cmd_line() const {
@@ -278,15 +284,17 @@ void GetCurrDirCommand::execute() {
     free(pwd);
 }
 
-ExternalCommand::ExternalCommand(const char *cmd_line, bool bg) : Command(cmd_line, bg) {
+ExternalCommand::ExternalCommand(const char *cmd_line) :
+    Command(cmd_line, _isBackgroundComamnd(cmd_line))  {
 }
 
 void ExternalCommand::execute() {
      SmallShell& smash= SmallShell::getInstance();
+    const string cmd_line_no_bg = _remove_bg_sign(cmd_line);
      pid_t child_pid= do_fork();
      if(child_pid==0) {
             setpgrp();
-            do_execvp(cmd_line.c_str());
+            do_execvp(cmd_line_no_bg.c_str());
 
      }
      else{
@@ -312,20 +320,29 @@ void QuitCommand::execute() {
     throw Quit();
 }
 
-JobsList::JobEntry::JobEntry(Command *cmd, pid_t pid_in, JobsList::JobId job_id, bool isStopped, int timer) :
-    cmd(cmd), pid(pid_in), job_id(job_id), isStopped(isStopped), timer(timer){
+JobEntry::JobEntry(Command *cmd, pid_t pid_in, JobId job_id, bool isStopped, int timer) :
+    cmd(cmd), pid(pid_in), job_id(job_id), time_in(time(nullptr)),
+    isStopped(isStopped), isDead(false), timer(timer){
 }
 
-std::ostream &operator<<(std::ostream &os, const JobsList::JobEntry &job) {
-    os << "[" << job.job_id << "]" << " " << job.cmd->getCommand() << " : ";
+std::ostream &operator<<(std::ostream &os, const JobEntry &job) {
+    os << "[" << job.job_id << "]" << " " << job.cmd->get_cmd_line() << " : ";
     os << job.pid << " ";
-    os << difftime(time(nullptr), job.cmd->time_in) << " secs";
+    os << job.run_time() << " secs";
     if(job.isStopped)
         os << " (stopped)";
     return os;
 }
 
-int JobsList::JobEntry::Kill(int signal) {
+int JobEntry::run_time() const {
+    return difftime(time(nullptr), time_in);
+}
+
+int JobEntry::time_left() const {
+    return timer-run_time();
+}
+
+int JobEntry::Kill(int signal)  {
     SmallShell& smash = SmallShell::getInstance();
     int res=do_kill(pid, signal);
     if(signal == SIGCONT) {
@@ -339,15 +356,29 @@ int JobsList::JobEntry::Kill(int signal) {
     return res;
 }
 
-bool JobsList::JobEntry::finish() const {
-    waitpid(pid, nullptr ,WNOHANG); //voodoo for command not found with &
-    return  waitpid(pid, nullptr ,WNOHANG)==-1 && !isStopped;
+bool JobEntry::is_finish()  {
+    if(!isDead) {
+        isDead = waitpid(pid, nullptr, WNOHANG) == pid;
+        if (isDead)
+            delete cmd;
+    }
+    return  isDead;//|| return_pid==-1;
+}
+/*
+JobEntry::~JobEntry() {
+    if(is_finish() && (isStopped || (cmd && cmd->bg)))//delete cmd only if removed from the Joblist
+        delete cmd;
+}*/
+
+void JobEntry::timeout() {
+    cout << "smash: got an alarm" << endl;
+    cout << "smash: " << cmd->get_cmd_line() << " timed out!"
+         << endl;
+    Kill();
 }
 
-JobsList::JobEntry::~JobEntry() {
-    if(finish())
-        delete cmd;
-}
+
+
 
 void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped, int timer) {
     removeFinishedJobs();
@@ -360,7 +391,7 @@ void JobsList::printJobsList() const{
     }
 }
 
-JobsList::JobId JobsList::allocJobId() const {
+JobId JobsList::allocJobId() const {
     return list.empty() ? 1 : list.back().job_id+1;
 }
 
@@ -368,13 +399,14 @@ void JobsList::killAllJobs() {
     removeFinishedJobs();
     cout<<"smash: sending SIGKILL signals to " << list.size() << " jobs:"<<endl;
     for(auto& job : list){
+        cout<< job.pid << ": " << job.cmd->get_cmd_line() << endl;
         job.Kill();
     }
 }
 
 void JobsList::removeFinishedJobs() {
     for(auto job=list.begin(); job!=list.end();){
-        if((*job).finish()) {
+        if((*job).is_finish()) {
             list.erase(job);
         }
         else
@@ -382,7 +414,7 @@ void JobsList::removeFinishedJobs() {
     }
 }
 
-JobsList::JobEntry *JobsList::getJobByPID(pid_t pid) {
+JobEntry *JobsList::getJobByPID(pid_t pid) {
     removeFinishedJobs();
     for(auto& job : list){
         if(job.pid==pid)
@@ -391,7 +423,7 @@ JobsList::JobEntry *JobsList::getJobByPID(pid_t pid) {
     return nullptr;
 }
 
-JobsList::JobEntry* JobsList::getJobByJobID(JobsList::JobId jobid) {
+JobEntry* JobsList::getJobByJobID(JobId jobid) {
     removeFinishedJobs();
     for(auto& job : list){
         if(job.job_id==jobid)
@@ -401,7 +433,7 @@ JobsList::JobEntry* JobsList::getJobByJobID(JobsList::JobId jobid) {
 }
 
 
-JobsList::JobEntry *JobsList::getLastJob(const JobsList::JobId* lastJobId) {
+JobEntry *JobsList::getLastJob(const JobId* lastJobId) {
     removeFinishedJobs();
     if (!lastJobId)
         return &list.front();
@@ -412,7 +444,7 @@ JobsList::JobEntry *JobsList::getLastJob(const JobsList::JobId* lastJobId) {
     return nullptr;
 }
 
-JobsList::JobEntry *JobsList::getLastStoppedJob() {
+JobEntry *JobsList::getLastStoppedJob() {
     if(last_stopped_jobs.empty()) return nullptr;
     return last_stopped_jobs.front();
 }
@@ -435,6 +467,24 @@ void JobsList::pushToStopped(JobEntry* job) {
     last_stopped_jobs.push_back(job);
 }
 
+void JobsList::removeTimedoutJobs(){
+    removeFinishedJobs();
+    for (auto it = list.begin(); it != list.end();) {
+        auto &job = *it;
+        //cout<<"LIST: run time: "<<job.run_time()<<" timer:"<<job.timer <<endl;
+        if (job.timer && job.run_time() >= job.timer) {
+            job.timeout();
+            list.erase(it);
+        } else
+            ++it;
+    }
+
+    JobEntry& fg_job = SmallShell::getInstance().fg_job;
+    //cout<<"run time: "<<fg_job.run_time()<<" timer:"<<fg_job.timer <<endl;
+    if(fg_job.cmd && fg_job.timer && fg_job.run_time() >= fg_job.timer)
+        fg_job.timeout();
+}
+/*
 void JobsList::removeTimedoutJob(JobId job_id) {
     SmallShell& smash = SmallShell::getInstance();
     for (auto job_id_it = timed_jobs.begin(); job_id_it != timed_jobs.end();) {
@@ -521,6 +571,21 @@ void JobsList::removeFinishedTimedjobs(JobId job_id) {
     }
     setAlarmTimer();
 }
+*/
+
+void JobsList::reset_timer(int new_timer) {
+    int timer=0;
+    for (auto & job : list) {
+        if (job.timer && (!timer || job.time_left()<timer) ){
+            timer=job.time_left();
+        }
+    }
+    if(new_timer && (!timer || new_timer<timer))
+        timer=new_timer;
+    if(timer)
+        alarm(timer);
+
+}
 
 JobsCommand::JobsCommand(const char *cmd_line):
     BuiltInCommand(cmd_line){}
@@ -558,23 +623,24 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string>& args) :
 
 void ChangeDirCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
-    string prev_dir = get_current_dir_name();
+    char* prev_dir = get_current_dir_name();
     do_chdir(next_dir.c_str());
     smash.set_prev_dir(prev_dir);
+    free(prev_dir);
 }
 
 ForegroundCommand::ForegroundCommand(const char *cmd_line, vector<string>& args) :
         BuiltInCommand(cmd_line), args(args){}
 
-ForegroundCommand::FGJobIDDoesntExist::FGJobIDDoesntExist(JobsList::JobId job_id): job_id(job_id){}
+ForegroundCommand::FGJobIDDoesntExist::FGJobIDDoesntExist(JobId job_id): job_id(job_id){}
 
 void ForegroundCommand::execute() {
     if(SmallShell::getInstance().jobs_list.empty()) throw FGEmptyJobsList();
     if(args.size()!= 2 && args.size() != 1) throw FGInvalidArgs();
-    JobsList::JobId* job_id = nullptr;
+    JobId* job_id = nullptr;
     if(args.size() == 2) {
         try {
-            JobsList::JobId id = stoi(args[1]);
+            JobId id = stoi(args[1]);
             job_id = &id;
         }
         catch (std::invalid_argument const &e) {
@@ -595,17 +661,17 @@ void ForegroundCommand::execute() {
 BackgroundCommand::BackgroundCommand(const char *cmd_line, vector<string> &args):
         BuiltInCommand(cmd_line), args(args){}
 
-BackgroundCommand::BGJobIDDoesntExist::BGJobIDDoesntExist(JobsList::JobId job_id): job_id(job_id){}
+BackgroundCommand::BGJobIDDoesntExist::BGJobIDDoesntExist(JobId job_id): job_id(job_id){}
 
-BackgroundCommand::BGJobAlreadyRunning::BGJobAlreadyRunning(JobsList::JobId job_id): job_id(job_id){}
+BackgroundCommand::BGJobAlreadyRunning::BGJobAlreadyRunning(JobId job_id): job_id(job_id){}
 
 void BackgroundCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     if(args.size() != 1 && args.size() != 2) throw BGInvalidArgs();
-    JobsList::JobId* job_id = nullptr;
+    JobId* job_id = nullptr;
     if(args.size() == 2) {
         try {
-            JobsList::JobId id = stoi(args[1]);
+            JobId id = stoi(args[1]);
             job_id = &id;}
         catch (std::invalid_argument const &e) {
             throw BGInvalidArgs();}
@@ -689,15 +755,16 @@ void KillCommand::execute() {
     if(job->Kill(sig_num)==0) cout<<"signal number "<<sig_num<<" was sent to pid "<<job->pid<<endl;
 }
 
-KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobsList::JobId job_id) :job_id(job_id){}
+KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobId job_id) :job_id(job_id){}
 
-PipeCommand::PipeCommand(const char *cmd_line_c, string sign, bool bg):
-    Command(cmd_line_c, bg), sign(sign)
+PipeCommand::PipeCommand(const char *cmd_line_c, string sign):
+    Command(cmd_line_c, _isBackgroundComamnd(cmd_line_c)), sign(sign)
 {
     string s_command1, s_command2;
     int sign_index = cmd_line.find(sign);
-    s_command1 = cmd_line.substr(0,sign_index);
-    s_command2 = cmd_line.substr(sign_index+sign.size(),cmd_line.size()-1);
+    string cmd_line_no_bg= _remove_bg_sign(cmd_line);
+    s_command1 = cmd_line_no_bg.substr(0,sign_index);
+    s_command2 = cmd_line_no_bg.substr(sign_index+sign.size(),string::npos);
     command1 = SmallShell::CreateCommand(s_command1.c_str());
     command2 = SmallShell::CreateCommand(s_command2.c_str());
     command1->bg=false;
@@ -732,7 +799,7 @@ void PipeCommand::execute() {
             do_close(pipefd[0]);
             do_close(pipefd[1]);
             if (bg) {
-                smash.jobs_list.addJob(command1, child_pid1);
+                smash.jobs_list.addJob(this, child_pid1);
                 smash.jobs_list.addJob(command2, child_pid2);
             } else {
                 smash.set_fg(child_pid1, this);
@@ -746,24 +813,30 @@ void PipeCommand::execute() {
     }
 }
 
+PipeCommand::~PipeCommand() {
+    delete command1;
+    delete command2;
+
+}
+
+
 RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
-                                       const string &IO_type,
-                                       bool bg) :
-    Command(cmd_line_c,  bg), IO_type(IO_type){
-    string sign= " "+IO_type+" ";
-    int sign_loc=cmd_line.find(sign);
-    cmd_left= SmallShell::CreateCommand(cmd_line.substr(0, sign_loc).c_str());
-    output_file= cmd_line.substr(sign_loc+sign.size(),  string::npos);
+                                       const string &IO_type) :
+    Command(cmd_line_c,  _isBackgroundComamnd(cmd_line_c)), IO_type(IO_type){
+    string sign= IO_type;
+    string cmd_line_no_bg_str= _remove_bg_sign(cmd_line);
+    int sign_loc=cmd_line_no_bg_str.find(sign);
+    cmd_left= SmallShell::CreateCommand(cmd_line_no_bg_str.substr(0, sign_loc).c_str());
+    output_file= cmd_line_no_bg_str.substr(sign_loc+sign.size()+1,  string::npos);
 }
 
 void RedirectionCommand::execute() {
-    int outfd=-1;
     int dest_flags=0;
     if(IO_type==">")
         dest_flags=O_CREAT | O_WRONLY | O_TRUNC;
     else if(IO_type==">>")
         dest_flags= O_CREAT | O_RDWR | O_APPEND;
-    do_open(output_file.c_str(), dest_flags);
+    int outfd=do_open(output_file.c_str(), dest_flags);
     pid_t child_pid= do_fork();
     if(child_pid==0) {
         do_dup2(outfd, STDOUT_FILENO);
@@ -783,17 +856,27 @@ void RedirectionCommand::execute() {
     do_close(outfd);
 }
 
-TimeoutCommand::TimeoutCommand(const char *cmd_line, vector<string> args, bool bg) : Command(cmd_line, bg) {
+RedirectionCommand::~RedirectionCommand() {
+    delete cmd_left;
+
+}
+
+TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : Command(cmd_line_in, _isBackgroundComamnd(cmd_line_in)) {
+    if (args.size()<3)
+        throw TimerInvalidArgs();
     try {
         timer = stoi(args[1]);
     }
     catch (std::invalid_argument const &e) {
         throw TimerInvalidArgs();
     }
+    /*
     string cmd_s = args[2];
     for(unsigned i = 3; i<args.size();i++){
         cmd_s += " " + args[i];
-    }
+    }*/
+    string cmd_line_no_bg = _remove_bg_sign(cmd_line);
+    string cmd_s = cmd_line.substr(cmd_line.find(args[2]), string::npos);
     cmd1 = SmallShell::CreateCommand(cmd_s.c_str());
 
 }
@@ -807,18 +890,23 @@ void TimeoutCommand::execute() {
         throw Quit();
     }
     else{
+        smash.jobs_list.reset_timer(timer);
         if(bg){
             smash.jobs_list.addJob(cmd1,child_pid,false,timer);
-            auto job = smash.jobs_list.getJobByPID(child_pid);
-            smash.jobs_list.addTimedJob(job->job_id);
+            //auto job = smash.jobs_list.getJobByPID(child_pid);
+            //smash.jobs_list.addTimedJob(job->job_id);
         }
         else{
             smash.set_fg(child_pid, this, timer);
-            smash.jobs_list.addTimedJob(-1);
+
             waitpid(child_pid, nullptr, WUNTRACED);
-            smash.jobs_list.removeFinishedTimedjobs(-1);
-            smash.set_fg(0, nullptr);
+            //smash.jobs_list.removeFinishedTimedjobs(-1);
+            smash.set_fg();
         }
     }
-    return;
+}
+
+TimeoutCommand::~TimeoutCommand() {
+    delete cmd1;
+
 }
