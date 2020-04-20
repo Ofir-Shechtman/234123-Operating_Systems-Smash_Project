@@ -352,8 +352,8 @@ bool JobEntry::is_finish()  {
     if(!isDead) {
         pid_t res=waitpid(pid, nullptr, WNOHANG);
         isDead = res == pid || res==-1;
-        if (isDead)
-            delete cmd;
+        /*if (isDead)
+            delete cmd;*/
     }
     return  isDead;//|| return_pid==-1;
 }
