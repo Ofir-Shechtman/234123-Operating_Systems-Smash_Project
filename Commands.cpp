@@ -327,11 +327,13 @@ std::ostream &operator<<(std::ostream &os, const JobEntry &job) {
 }
 
 int JobEntry::run_time() const {
+    //cout<<"time: "<<time(nullptr)<<" "<<endl;
     return difftime(time(nullptr), time_in);
 }
 
 int JobEntry::time_left() const {
-    return timer-run_time();
+    //cout<<"timerr: "<<timer << " time_in: "<<time_in<<" "<<endl;
+    return this->timer-run_time();
 }
 
 int JobEntry::Kill(int signal)  {
@@ -474,10 +476,12 @@ void JobsList::removeTimedoutJobs(){
             ++it;
     }
 
-    JobEntry& fg_job = SmallShell::getInstance().fg_job;
-    //cout<<"run time: "<<fg_job.run_time()<<" timer:"<<fg_job.timer <<endl;
-    if(fg_job.cmd && fg_job.timer && fg_job.run_time() >= fg_job.timer)
+    JobEntry &fg_job = SmallShell::getInstance().fg_job;
+    //cout<<"run time: "<<fg_job.run_time()<<" timer:"<<fg_job.timer <<" if"<<(fg_job.cmd!=nullptr) << fg_job.timer << (fg_job.run_time() >= fg_job.timer) <<endl;
+    if (fg_job.cmd && fg_job.timer && fg_job.run_time() >= fg_job.timer) {
         fg_job.timeout();
+        fg_job = JobEntry();
+    }
 }
 /*
 void JobsList::removeTimedoutJob(JobId job_id) {
@@ -571,12 +575,15 @@ void JobsList::removeFinishedTimedjobs(JobId job_id) {
 void JobsList::reset_timer(int new_timer) {
     int timer=0;
     for (auto & job : list) {
-        if (job.timer && (!timer || job.time_left()<job.timer) ){
+        //cout<<"time_left: "<<job.time_left()<<" job.timer: "<<job.timer<<" timer: "<<timer <<endl;
+        if (job.timer && (!timer || job.time_left()<timer) ){
             timer=job.time_left();
         }
     }
     auto& fg_job = SmallShell::getInstance().fg_job;
-    if(fg_job.timer && (!timer || fg_job.time_left()<fg_job.timer))
+    //if(fg_job.timer)
+        //cout<<" time_left: "<<fg_job.time_left()<<" timer: "<<timer <<endl;
+    if(fg_job.timer && (!timer || fg_job.time_left()<timer))
         timer=fg_job.time_left();
 
     if(new_timer && (!timer || new_timer<timer))
@@ -882,7 +889,6 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : C
     string cmd_line_no_bg = _remove_bg_sign(cmd_line);
     string cmd_s = cmd_line_no_bg.substr(cmd_line_no_bg.find(args[2]), string::npos);
     cmd1 = SmallShell::CreateCommand(cmd_s.c_str());
-
 }
 
 void TimeoutCommand::execute() {
