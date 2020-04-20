@@ -20,7 +20,6 @@ public:
   explicit Command(const char* cmd_line, bool bg);
   virtual ~Command()= default;;
   virtual void execute() = 0;
-  // TODO: Add your extra methods if needed
   string getCommand() const;
   string get_cmd_line() const;
 };
