@@ -173,8 +173,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
    try {
         cmd = CreateCommand(cmd_line);
         cmd->execute();
-        if(!cmd->bg)
-            delete cmd;
    }
    catch(Quit& quit) {
        delete cmd;
@@ -182,50 +180,38 @@ void SmallShell::executeCommand(const char *cmd_line) {
    }
    catch(ChangeDirCommand::TooManyArgs& tma){
        cout<<"smash error: cd: too many arguments"<<endl;
-       delete cmd;
    }
    catch(ChangeDirCommand::TooFewArgs& tfa){
-       delete cmd;
    }
    catch(ChangeDirCommand::NoOldPWD& nop){
        cout<<"smash error: cd: OLDPWD not set"<<endl;
-       delete cmd;
    }
    catch(KillCommand::KillInvalidArgs& kia){
        cout<<"smash error: kill: invalid arguments"<<endl;
-       delete cmd;
    }
    catch(KillCommand::KillJobIDDoesntExist& kill_job_doesnt_exist){
        cout<<"smash error: kill: job-id "<<kill_job_doesnt_exist.job_id<<" does not exist"<<endl;
-       delete cmd;
    }
    catch(ForegroundCommand::FGEmptyJobsList& fgejl){
        cout<<"smash error: fg: jobs list is empty"<<endl;
-       delete cmd;
    }
    catch(ForegroundCommand::FGInvalidArgs& fia){
        cout<<"smash error: fg: invalid arguments"<<endl;
-       delete cmd;
    }
    catch(ForegroundCommand::FGJobIDDoesntExist& fg_job_doesnt_exist) {
        cout << "smash error: fg: job-id " << fg_job_doesnt_exist.job_id << " does not exist" << endl;
-       delete cmd;
    }
    catch(BackgroundCommand::BGJobIDDoesntExist& bg_job_doesnt_exist){
        cout<<"smash error: bg: job-id "<<bg_job_doesnt_exist.job_id<<" does not exist"<<endl;
-       delete cmd;
    }
    catch(BackgroundCommand::BGJobAlreadyRunning& bg_job_already_running){
        cout<<"smash error: bg: job-id "<<bg_job_already_running.job_id<<" is already running in the background"<<endl;
-       delete cmd;
    }
    catch(BackgroundCommand::BGNoStoppedJobs& bgnsj){
        cout<<"smash error: bg: there is no stopped jobs to resume"<<endl;
-       delete cmd;
    }
    catch(BackgroundCommand::BGInvalidArgs& bia){
        cout<<"smash error: bg: invalid arguments"<<endl;
-       delete cmd;
    }
 }
 
@@ -278,9 +264,11 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line, _isBack
 }
 
 void GetCurrDirCommand::execute() {
+    SmallShell& smash= SmallShell::getInstance();
     char* pwd=get_current_dir_name();
     cout<< pwd << endl;
     free(pwd);
+    smash.replace_fg_and_wait();
 }
 
 ExternalCommand::ExternalCommand(const char *cmd_line) :
@@ -294,7 +282,6 @@ void ExternalCommand::execute() {
      if(child_pid==0) {
             setpgrp();
             do_execvp(cmd_line_no_bg.c_str());
-
      }
      else{
          if(bg)
@@ -317,7 +304,7 @@ void QuitCommand::execute() {
     if(args.size()>1 && args[1]=="kill")
         jobs_list.killAllJobs();
     jobs_list.deleteAll();
-    delete smash.fg_job.cmd;
+    smash.replace_fg_and_wait();
     throw Quit();
 }
 
@@ -350,6 +337,7 @@ int JobEntry::Kill(int signal)  {
     int res=do_kill(pid, signal);
     if(signal == SIGCONT) {
         isStopped = false;
+        cmd->bg = false;
         smash.jobs_list.removeFromStopped(job_id);
     }
     else if(signal == SIGSTOP) {
@@ -607,8 +595,10 @@ JobsCommand::JobsCommand(const char *cmd_line):
     BuiltInCommand(cmd_line){}
 
 void JobsCommand::execute() {
-    SmallShell::getInstance().jobs_list.removeFinishedJobs();
-    SmallShell::getInstance().jobs_list.printJobsList();
+    auto &smash = SmallShell::getInstance();
+    smash.jobs_list.removeFinishedJobs();
+    smash.jobs_list.printJobsList();
+    smash.replace_fg_and_wait();
 }
 
 ChangePromptCommand::ChangePromptCommand(const char* cmd_line, vector<string>& args) : BuiltInCommand(cmd_line) {
@@ -619,11 +609,13 @@ ChangePromptCommand::ChangePromptCommand(const char* cmd_line, vector<string>& a
 void ChangePromptCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     smash.set_prompt(input_prompt);
+    smash.replace_fg_and_wait();
 }
 
 void ShowPidCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     cout<<"smash pid is "<<smash.get_pid()<<endl;
+    smash.replace_fg_and_wait();
 }
 
 ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string>& args) : BuiltInCommand(cmd_line){
@@ -643,6 +635,7 @@ void ChangeDirCommand::execute() {
     do_chdir(next_dir.c_str());
     smash.set_prev_dir(prev_dir);
     free(prev_dir);
+    smash.replace_fg_and_wait();
 }
 
 ForegroundCommand::ForegroundCommand(const char *cmd_line, vector<string>& args) :
@@ -651,7 +644,8 @@ ForegroundCommand::ForegroundCommand(const char *cmd_line, vector<string>& args)
 ForegroundCommand::FGJobIDDoesntExist::FGJobIDDoesntExist(JobId job_id): job_id(job_id){}
 
 void ForegroundCommand::execute() {
-    if(SmallShell::getInstance().jobs_list.empty()) throw FGEmptyJobsList();
+    auto& smash = SmallShell::getInstance();
+    if(smash.jobs_list.empty()) throw FGEmptyJobsList();
     if(args.size()!= 2 && args.size() != 1) throw FGInvalidArgs();
     JobId* job_id = nullptr;
     if(args.size() == 2) {
@@ -663,12 +657,10 @@ void ForegroundCommand::execute() {
             throw FGInvalidArgs();
         }
     }
-    auto job= SmallShell::getInstance().jobs_list.getLastJob(job_id);
+    auto job= smash.jobs_list.getLastJob(job_id);
     if(job == nullptr) throw FGJobIDDoesntExist(*job_id);
     job->Kill(SIGCONT);
-    job->cmd->bg=false;
     cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
-    auto& smash=SmallShell::getInstance();
     smash.replace_fg_and_wait(JobEntry(job->cmd, job->pid));
 }
 
@@ -700,6 +692,7 @@ void BackgroundCommand::execute() {
     }
     cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
     job->Kill(SIGCONT);
+    smash.replace_fg_and_wait();
 }
 
 void CopyCommand::copy(const char* infile, const char* outfile) {
@@ -764,6 +757,7 @@ void KillCommand::execute() {
     auto job= smash.jobs_list.getJobByJobID(job_id);
     if (job == nullptr) throw KillJobIDDoesntExist(job_id);
     if(job->Kill(sig_num)==0) cout<<"signal number "<<sig_num<<" was sent to pid "<<job->pid<<endl;
+    smash.replace_fg_and_wait();
 }
 
 KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobId job_id) :job_id(job_id){}
@@ -828,7 +822,6 @@ void PipeCommand::execute() {
 PipeCommand::~PipeCommand() {
     delete command1;
     delete command2;
-
 }
 
 
@@ -914,8 +907,6 @@ void TimeoutCommand::execute() {
         smash.jobs_list.reset_timer(timer);
         if(bg){
             smash.jobs_list.addJob(JobEntry(this,child_pid,timer));
-            //auto job = smash.jobs_list.getJobByPID(child_pid);
-            //smash.jobs_list.addTimedJob(job->job_id);
         }
         else{
             smash.replace_fg_and_wait(JobEntry(this,child_pid,timer));

@@ -278,7 +278,7 @@ public:
   void set_prompt(string input_prompt);
   string get_prev_dir() const;
   void set_prev_dir(string new_dir);
-  void replace_fg_and_wait(JobEntry job);
+  void replace_fg_and_wait(JobEntry job = JobEntry());
   //void set_min_time_job_pid(pid_t pid);
   // TODO: add extra methods as needed
 };
