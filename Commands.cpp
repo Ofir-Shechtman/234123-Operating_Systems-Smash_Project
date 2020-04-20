@@ -430,7 +430,9 @@ JobEntry* JobsList::getJobByJobID(JobId jobid) {
 
 JobEntry *JobsList::getLastJob(const JobId* lastJobId) {
     removeFinishedJobs();
-    if (!lastJobId and !empty())
+    if(list.empty())
+        return nullptr;
+    if (!lastJobId)
         return &list.front();
     for (auto &job : list) {
         if (job.job_id == *lastJobId)

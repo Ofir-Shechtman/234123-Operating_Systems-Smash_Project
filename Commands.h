@@ -154,7 +154,7 @@ public:
   JobEntry * getJobByPID(pid_t);
   JobEntry * getJobByJobID(JobId);
   //void removeJobById(JobId);
-  JobEntry * getLastJob(const JobId* lastJobId);
+  JobEntry * getLastJob(const JobId* lastJobId= nullptr);
   JobEntry *getLastStoppedJob();
   void pushToStopped(JobId);
   void removeFromStopped(JobId);
