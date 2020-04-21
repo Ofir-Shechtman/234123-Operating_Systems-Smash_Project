@@ -130,37 +130,37 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       else if(cmd_s.find('|') != string::npos) {
           return new PipeCommand(cmd_line, "|");
       }
-      else if (cmd_s.find("timeout") == 0) {
+      else if (args[0] == "timeout") {
             return new TimeoutCommand(cmd_line, args);
       }
-      else if (cmd_s.find("chprompt") == 0) {
+      else if (args[0] == "chprompt") {
             return new ChangePromptCommand(cmd_line, args);
       }
-      else if (cmd_s.find("showpid") == 0) {
+      else if (args[0] == "showpid") {
           return new ShowPidCommand(cmd_line);
       }
-      else if (cmd_s.find("pwd") == 0) {
+      else if (args[0] == "pwd") {
         return new GetCurrDirCommand(cmd_line);
       }
-      else if (cmd_s.find("cd") == 0) {
+      else if (args[0] == "cd") {
         return new ChangeDirCommand(cmd_line, args);
       }
-      else if (cmd_s.find("kill") == 0) {
+      else if (args[0] == "kill") {
           return new KillCommand(cmd_line, args);
       }
-      else if(cmd_s.find("quit") == 0) {
+      else if(args[0] == "quit") {
           return new QuitCommand(cmd_line, args);
       }
-      else if(cmd_s.find("jobs") == 0) {
+      else if(args[0] == "jobs") {
           return new JobsCommand(cmd_line);
       }
-      else if(cmd_s.find("fg") == 0) {
+      else if(args[0] == "fg") {
           return new ForegroundCommand(cmd_line, args);
       }
-      else if(cmd_s.find("bg") == 0) {
+      else if(args[0] == "bg") {
           return new BackgroundCommand(cmd_line, args);
       }
-      else if(cmd_s.find("cp") == 0) {
+      else if(args[0] == "cp") {
           return new CopyCommand(cmd_line, args);
       }
       else {
@@ -341,6 +341,7 @@ int JobEntry::Kill(int signal)  {
     else if(signal == SIGSTOP) {
         isStopped = true;
         cmd->bg = true;
+        time_in = time(nullptr);
         smash.jobs_list.pushToStopped(this->job_id);
     }
     else if(signal == SIGKILL){
@@ -434,7 +435,7 @@ JobEntry *JobsList::getLastJob(const JobId* lastJobId) {
     if(list.empty())
         return nullptr;
     if (!lastJobId)
-        return &list.front();
+        return &list.back();
     for (auto &job : list) {
         if (job.job_id == *lastJobId)
             return &job;
@@ -655,7 +656,7 @@ void ForegroundCommand::execute() {
     JobId* job_id = nullptr;
     if(args.size() == 2) {
         try {
-            JobId id = stoi(args[1]);
+            JobId id = do_stoi(args[1]);
             job_id = &id;
         }
         catch (std::invalid_argument const &e) {
@@ -681,7 +682,7 @@ void BackgroundCommand::execute() {
     JobId* job_id = nullptr;
     if(args.size() == 2) {
         try {
-            JobId id = stoi(args[1]);
+            JobId id = do_stoi(args[1]);
             job_id = &id;}
         catch (std::invalid_argument const &e) {
             throw BGInvalidArgs();}
@@ -748,12 +749,14 @@ void CopyCommand::execute() {
 KillCommand::KillCommand(const char *cmdLine1, vector<string> &args) : BuiltInCommand(cmdLine1) {
     if(args.size() != 3 || args[1].substr(0,1) != "-") throw KillInvalidArgs();
     try {
-        sig_num = stoi(args[1].substr(1));
-        job_id = stoi(args[2]);
+        sig_num = do_stoi(args[1].substr(1));
+        job_id = do_stoi(args[2]);
     }
     catch(std::invalid_argument const &e) {
         throw KillInvalidArgs();
     }
+    if(sig_num < 1 || sig_num > 31)
+        throw KillInvalidArgs();
 }
 
 void KillCommand::execute() {
@@ -879,7 +882,7 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : C
     if (args.size()<3)
         throw TimerInvalidArgs();
     try {
-        timer = stoi(args[1]);
+        timer = do_stoi(args[1]);
     }
     catch (std::invalid_argument const &e) {
         throw TimerInvalidArgs();

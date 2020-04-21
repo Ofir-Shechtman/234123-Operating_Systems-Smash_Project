@@ -105,3 +105,12 @@ pid_t  do_waitpid(pid_t pid, int *stat_loc, int options){
         return waitpid(pid, stat_loc, options);
     return 0;
 }
+
+int do_stoi(std::string num) {
+    size_t size;
+    int value;
+    value = stoi(num,&size);
+    if(size != num.size())
+        throw std::invalid_argument(num);
+    return value;
+}

@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <istream>
+#include <stdexcept>
 
 class Quit : public std::exception{};
 class Continue : public std::exception{};
@@ -19,6 +20,7 @@ int  do_read(int fd, char* buffer, int BUFSIZE);
 int  do_write(int df, char* buffer, int n);
 void do_close(int fd);
 int  do_fork();
+int  do_stoi(std::string num);
 void do_execvp(const char* cmd);
 int  do_kill(pid_t pid, int signal);
 void do_chdir(const char* path);
