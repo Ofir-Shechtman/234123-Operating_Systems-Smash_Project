@@ -216,6 +216,7 @@ class BackgroundCommand : public BuiltInCommand {
 public:
     BackgroundCommand(const char* cmd_line, vector<string>& args);
     ~BackgroundCommand() override = default;
+    void execute() override;
     class BGJobIDDoesntExist: public std::exception{
     public:
         JobId job_id;
@@ -228,7 +229,6 @@ public:
     };
     class BGNoStoppedJobs: public std::exception{};
     class BGInvalidArgs: public std::exception{};
-    void execute() override;
 };
 
 

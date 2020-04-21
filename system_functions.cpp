@@ -1,5 +1,3 @@
-#include <signal.h>
-#include <istream>
 #include "system_functions.h"
 
 
@@ -95,4 +93,10 @@ void do_chdir(const char *path) {
         throw Continue();
     }
 
+}
+
+pid_t  do_waitpid(pid_t pid, int *stat_loc, int options){
+    if(pid)
+        return waitpid(pid, stat_loc, options);
+    return 0;
 }

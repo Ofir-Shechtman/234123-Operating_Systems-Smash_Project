@@ -14,8 +14,9 @@ void ctrlZHandler(int sig_num) {
         return;
     }
     cout << "smash: got ctrl-Z" << endl;
-
     auto &job = smash.fg_job;
+    if(!job.pid)
+        return;
     if (job.pid) {
         auto job_in_list = smash.jobs_list.getJobByPID(job.pid);
         if (job_in_list) { //was before in bg
