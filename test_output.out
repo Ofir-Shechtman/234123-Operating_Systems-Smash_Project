@@ -1,0 +1,159 @@
+smash> chprompt abc dd dd  2fcd &
+abc> chprompt
+smash> chprompt22
+smash> /bin/bash: chprompt22: command not found
+
+smash> showpid asc5 156d &
+smash pid is 110774
+smash> 
+smash> pwd 2hehr3 frej   3   &
+/home/student/CLionProjects/smash
+smash> 
+smash> cd - 33
+smash> smash error: cd: too many arguments
+pwd
+/home/student/CLionProjects/smash
+smash> cd .. 3 &
+smash> smash error: cd: too many arguments
+cd - 15d13 135 3  &
+smash> smash error: cd: too many arguments
+cd -
+smash> smash error: cd: OLDPWD not set
+pwd
+/home/student/CLionProjects/smash
+smash> cd ..
+smash> pwd
+/home/student/CLionProjects
+smash> cd
+smash> cd -
+smash> pwd
+/home/student/CLionProjects/smash
+smash> cd 3nj54
+smash> smash error: chdir failed: No such file or directory
+pwd
+/home/student/CLionProjects/smash
+smash>  
+smash> sleep 100 &
+smash> sleep 200
+smash: got ctrl-Z
+smash: process 110781 was stopped
+smash> jobs
+[1] sleep 100 & : 110780 1 secs
+[2] sleep 200 : 110781 0 secs (stopped)
+smash> kill -9 2
+signal number 9 was sent to pid 110781
+smash> jobs
+[1] sleep 100 & : 110780 1 secs
+smash> kill    -9 1
+signal number 9 was sent to pid 110780
+smash> jobs
+smash> kill -9 1
+smash> smash error: kill: job-id 1 does not exist
+kill 9   1
+smash> smash error: kill: invalid arguments
+kill     abc 1
+smash> smash error: kill: invalid arguments
+kill 1   abc&
+smash> smash error: kill: invalid arguments
+kill -12a 2
+smash> smash error: kill: invalid arguments
+kill  3 33 3
+smash> smash error: kill: invalid arguments
+kill -32 1
+smash> smash error: kill: invalid arguments
+sleep 500&
+smash> kill -314 1&
+smash> smash error: kill: invalid arguments
+
+smash> fg
+sleep 500& : 110786
+smash: got ctrl-C
+smash: process 110786 was killed
+smash> fg
+smash> smash error: fg: jobs list is empty
+bg
+smash> smash error: bg: there is no stopped jobs to resume
+sleep 100 &
+smash> sleep 200 &
+smash> sleep 300 & 
+smash> sleep 400 
+smash: got ctrl-Z
+smash: process 110793 was stopped
+smash> sleep 500
+smash: got ctrl-C
+smash: process 110794 was killed
+smash> jobs
+[1] sleep 100 & : 110790 1 secs
+[2] sleep 200 & : 110791 1 secs
+[3] sleep 300 &  : 110792 1 secs
+[4] sleep 400  : 110793 0 secs (stopped)
+smash> fg 4
+sleep 400  : 110793
+smash: got ctrl-C
+smash: process 110793 was killed
+smash> jobs
+[1] sleep 100 & : 110790 1 secs
+[2] sleep 200 & : 110791 1 secs
+[3] sleep 300 &  : 110792 1 secs
+smash> fg
+sleep 300 &  : 110792
+smash: got ctrl-Z
+smash: process 110792 was stopped
+smash> jobs
+[1] sleep 100 & : 110790 1 secs
+[2] sleep 200 & : 110791 1 secs
+[3] sleep 300 &  : 110792 0 secs (stopped)
+smash> bg
+sleep 300 &  : 110792
+smash> jobs
+[1] sleep 100 & : 110790 1 secs
+[2] sleep 200 & : 110791 1 secs
+[3] sleep 300 &  : 110792 0 secs
+smash> fg
+sleep 300 &  : 110792
+smash: got ctrl-Z
+smash: process 110792 was stopped
+smash> jobs
+[1] sleep 100 & : 110790 1 secs
+[2] sleep 200 & : 110791 1 secs
+[3] sleep 300 &  : 110792 0 secs (stopped)
+smash> bg 3
+sleep 300 &  : 110792
+smash> bg 1
+smash> smash error: bg: job-id 1 is already running in the background
+fg 2
+sleep 200 & : 110791
+smash: got ctrl-Z
+smash: process 110791 was stopped
+smash> bg
+sleep 200 & : 110791
+smash>         jobs
+[1] sleep 100 & : 110790 2 secs
+[2] sleep 200 & : 110791 0 secs
+[3] sleep 300 &  : 110792 1 secs
+smash> bg 3
+smash> smash error: bg: job-id 3 is already running in the background
+bg 3
+smash> smash error: bg: job-id 3 is already running in the background
+bg 3 4
+smash> smash error: bg: invalid arguments
+bg a
+smash> smash error: bg: invalid arguments
+bg
+smash> smash error: bg: there is no stopped jobs to resume
+bg 1
+smash> smash error: bg: job-id 1 is already running in the background
+bg 2
+smash> smash error: bg: job-id 2 is already running in the background
+fg
+sleep 300 &  : 110792
+smash: got ctrl-C
+smash: process 110792 was killed
+smash> jobs
+[1] sleep 100 & : 110790 7 secs
+[2] sleep 200 & : 110791 5 secs
+smash> 
+smash> quit kill 64
+smash: sending SIGKILL signals to 2 jobs:
+110790: sleep 100 &
+110791: sleep 200 &

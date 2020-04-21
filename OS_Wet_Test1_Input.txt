@@ -1,0 +1,81 @@
+chprompt abc dd dd  2fcd &
+chprompt
+chprompt22
+
+showpid asc5 156d &
+
+pwd 2hehr3 frej   3   &
+
+cd - 33
+pwd
+cd .. 3 &
+cd - 15d13 135 3  &
+cd -
+pwd
+cd ..
+pwd
+cd
+cd -
+pwd
+cd 3nj54
+pwd
+ 
+sleep 100 &
+sleep 200
+Ctrl-Z
+jobs
+kill -9 2
+jobs
+kill    -9 1
+jobs
+kill -9 1
+kill 9   1
+kill     abc 1
+kill 1   abc&
+kill -12a 2
+kill  3 33 3
+kill -32 1
+sleep 500&
+kill -314 1&
+
+fg
+Ctrl-C
+fg
+bg
+sleep 100 &
+sleep 200 &
+sleep 300 & 
+sleep 400 
+Ctrl-Z
+sleep 500
+Ctrl-C
+jobs
+fg 4
+Ctrl-C
+jobs
+fg
+Ctrl-Z
+jobs
+bg
+jobs
+fg
+Ctrl-Z
+jobs
+bg 3
+bg 1
+fg 2
+Ctrl-Z
+bg
+        jobs
+bg 3
+bg 3
+bg 3 4
+bg a
+bg
+bg 1
+bg 2
+fg
+Ctrl-C
+jobs
+
+quit kill 64

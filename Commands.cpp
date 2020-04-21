@@ -117,8 +117,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       const string cmd_line_no_bg = _remove_bg_sign(cmd_line);
       vector<string> args=_parseCommandLine(cmd_line_no_bg.c_str());
       string cmd_s = string(cmd_line);
-
-      if(cmd_s.find(">>") != string::npos) {
+      if (args.size() == 0) {
+          return new ExternalCommand(cmd_line);
+      }
+      else if(cmd_s.find(">>") != string::npos) {
         return new RedirectionCommand(cmd_line, ">>");
       }
       else if(cmd_s.find('>') != string::npos) {
