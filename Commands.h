@@ -82,7 +82,7 @@ class RedirectionCommand : public Command {
 
 class TimeoutCommand : public Command {
     int timer;
-    Command* cmd1;
+    Command* cmd;
 public:
     explicit TimeoutCommand(const char* cmd_line, vector<string> args);
     ~TimeoutCommand() override;

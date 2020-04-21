@@ -8,10 +8,18 @@ from os import path, strerror
 from functools import wraps
 import signal
 
-#NEXT = ['>', ' ', '\x1B', '[', '0', 'm']
+RED = "\x1b[1;31m"
+GREEN = "\x1b[1;32m"
+CYAN = "\x1B[0m"
+RETURN = "\x1b[0m"
+
 
 class TimeoutError(Exception):
     pass
+
+
+def add_color(text, color):
+    return color + text + RETURN
 
 
 def timeout(seconds=10, error_message=strerror(ETIME)):
@@ -43,8 +51,9 @@ def getProcess(name):
             pass
     return smashes
 
+
 class SmashRunner:
-    def __init__(self, executable, test_path, NEXT="> \x1B[0m", out_path=sys.stdout):
+    def __init__(self, executable, test_path, NEXT="> \x1B[0m", color=True, out_path=sys.stdout):
         self.test_file = open(test_path, "r")
         if (isinstance(out_path, str)):
             self.out_file = open(out_path, "w")
@@ -69,9 +78,13 @@ class SmashRunner:
         self.NEXT = list(NEXT.encode().decode('unicode-escape'))
         self.NONE = [None] * len(self.NEXT)
         self.last = self.NONE[:]
+        self.color = color
 
     def execute(self, command):
-        self.out_file.write('\x1b[1;32m' + command + '\x1b[0m')
+        color_command = command
+        if self.color:
+            color_command = add_color(command, CYAN)
+        self.out_file.write(color_command)
         self.out_file.write('\n')
         self.out_file.flush()
 
@@ -129,11 +142,15 @@ class SmashRunner:
                     return
             if out:
                 self.push(out)
+                if self.color:
+                    out = add_color(out, RED)
                 self.out_file.write(out)  # '\x1b[1;37m' + out + '\x1b[0m'
                 self.out_file.flush()
 
             if err:
-                self.err_file.write('\x1b[1;31m' + err + '\x1b[0m')
+                if self.color:
+                    err = add_color(err, RED)
+                self.err_file.write(err)
                 sys.stderr.flush()
 
             if out == '' and self.shell_process.poll() is not None:

@@ -49,23 +49,7 @@ void ctrlCHandler(int sig_num) {
 
 void alarmHandler(int sig_num) {
     auto& smash=SmallShell::getInstance();
-    if(smash.pid!=getpid())
-        return;
     smash.jobs_list.removeTimedoutJobs();
     smash.jobs_list.reset_timer();
-    /*
-    if(smash.min_time_job_pid == smash.fg_pid){
-        smash.jobs_list.removeTimedoutJob(-1);
-    }
-    else if(smash.min_time_job_pid) {
-        auto job = smash.jobs_list.getJobByPID(smash.min_time_job_pid);
-        if(!job) {
-            smash.jobs_list.removeFinishedTimedjobs();
-            smash.set_min_time_job_pid(0);
-            return;
-        }
-        smash.jobs_list.removeTimedoutJob();
-    }
-     */
 }
 

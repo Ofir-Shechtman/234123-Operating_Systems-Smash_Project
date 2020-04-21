@@ -14,21 +14,23 @@ class SmashTester:
         self.reset = args.reset
         self.valgrind = args.valgrind
         self.next = args.next
+        self.color = args.color or not self.output
         self.pids = {}
         self.PID_SEQUENCE = 10000
+
 
     def run(self):
         if(len(self.tests)>1):
             for i, input in enumerate(self.tests):
-                smash = SmashRunner(self.executable, input, self.next, self.output+"{}.out".format(i))
+                smash = SmashRunner(self.executable, input, self.next, self.color, self.output+"{}.out".format(i))
                 smash.run()
                 if self.reset:
                     self.pid_reset(self.output+"{}.out".format(i))
         else:
             if(self.output):
-                smash = SmashRunner(self.executable, self.tests[0], self.next, self.output + ".out")
+                smash = SmashRunner(self.executable, self.tests[0], self.next, self.color, self.output + ".out")
             else:
-                smash = SmashRunner(self.executable, self.tests[0], self.next)
+                smash = SmashRunner(self.executable, self.tests[0], self.next, self.color)
             smash.run()
             if self.reset:
                 self.pid_reset(self.output + ".out")
@@ -95,6 +97,8 @@ def create_parser():
                         help='run valgeind, not working yet')
     parser.add_argument('--reset', '-r', action='store_true',
                         help='reset PIDs, works only on -o mode')
+    parser.add_argument('--color', '-c', action='store_true',
+                        help='add colors')
     parser.add_argument('--next', '-n', default="> ",
                         help='different template then "smash> "')
     parser.add_argument('input', metavar='input_file', type=str, nargs='+',

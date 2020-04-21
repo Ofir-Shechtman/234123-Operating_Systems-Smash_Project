@@ -848,24 +848,18 @@ void RedirectionCommand::execute() {
     else if(IO_type==">>")
         dest_flags= O_CREAT | O_RDWR | O_APPEND;
     int outfd=do_open(output_file.c_str(), dest_flags);
-    pid_t redir_pid= do_fork();
-    if(redir_pid==0) {
-        pid_t child_pid = do_fork();
-        if (child_pid == 0) {
-            do_dup2(outfd, STDOUT_FILENO);
-            cmd_left->execute();
-            throw Quit();
-        }
-        else{
-            do_waitpid(child_pid, nullptr, WUNTRACED);
-            throw Quit();
-        }
+    pid_t child_pid = do_fork();
+    if (child_pid == 0) {
+        do_dup2(outfd, STDOUT_FILENO);
+        cmd_left->execute();
+        throw Quit();
     }
+
     else{
         if(bg)
-            smash.jobs_list.addJob(JobEntry(this, redir_pid));
+            smash.jobs_list.addJob(JobEntry(this, child_pid));
         else{
-            smash.replace_fg_and_wait(JobEntry(this, redir_pid));
+            smash.replace_fg_and_wait(JobEntry(this, child_pid));
 
         }
     }
@@ -887,6 +881,9 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : C
     catch (std::invalid_argument const &e) {
         throw TimerInvalidArgs();
     }
+    if (timer<0){
+        throw TimerInvalidArgs();
+    }
     /*
     string cmd_s = args[2];
     for(unsigned i = 3; i<args.size();i++){
@@ -894,14 +891,14 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : C
     }*/
     string cmd_line_no_bg = _remove_bg_sign(cmd_line);
     string cmd_s = cmd_line_no_bg.substr(cmd_line_no_bg.find(args[2]), string::npos);
-    cmd1 = SmallShell::CreateCommand(cmd_s.c_str());
+    cmd = SmallShell::CreateCommand(cmd_s.c_str());
 }
 
 void TimeoutCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     pid_t child_pid= do_fork();
     if(child_pid==0) {
-        cmd1->execute();
+        cmd->execute();
         throw Quit();
     }
     else{
@@ -916,7 +913,7 @@ void TimeoutCommand::execute() {
 }
 
 TimeoutCommand::~TimeoutCommand() {
-    delete cmd1;
+    delete cmd;
 
 }
 
