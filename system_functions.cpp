@@ -1,4 +1,5 @@
 #include "system_functions.h"
+#include "Commands.h"
 
 
 void do_perror(const char* syscall) {
@@ -47,11 +48,15 @@ int do_write(int df, char *buffer, int n) {
 }
 
 int do_fork() {
+    SmallShell& smash= SmallShell::getInstance();
+    bool gp=smash.pid==getpid();
     int child = fork();
-    if(child<0){
+    if(child<0) {
         do_perror("fork");
         throw Continue();
     }
+    else if(child==0 && gp)
+        setpgrp();
     return child;
 }
 
