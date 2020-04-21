@@ -335,7 +335,6 @@ int JobEntry::time_left() const {
 
 int JobEntry::Kill(int signal)  {
     SmallShell& smash = SmallShell::getInstance();
-    int res=do_kill(pid, signal);
     if(signal == SIGCONT) {
         isStopped = false;
         cmd->bg = false;
@@ -346,6 +345,10 @@ int JobEntry::Kill(int signal)  {
         cmd->bg = true;
         smash.jobs_list.pushToStopped(this->job_id);
     }
+    else if(signal == SIGKILL){
+        smash.jobs_list.removeFromStopped(job_id);
+    }
+    int res=do_kill(pid, signal);
     return res;
 }
 
