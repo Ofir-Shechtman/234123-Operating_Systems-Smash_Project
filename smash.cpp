@@ -18,7 +18,14 @@ int main(int argc, char* argv[]) {
     }
     if(signal(SIGALRM ,alarmHandler)==SIG_ERR) {
         perror("smash error: failed to set ctrl-C handler");//TODO:change
-    }
+    }/*
+    for(int i=1;i<32;i++){
+        if(i==SIGTSTP||i==SIGINT||i==SIGKILL||i==SIGSTOP){
+            continue;
+        }else{
+            signal(i,printHandler);
+        }
+    }*/
     //TODO: setup sig alarm handler
     SmallShell& smash = SmallShell::getInstance();
     while(true) {

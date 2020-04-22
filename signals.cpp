@@ -20,31 +20,33 @@ void ctrlZHandler(int sig_num) {
     if (job.pid) {
         auto job_in_list = smash.jobs_list.getJobByPID(job.pid);
         if (job_in_list) { //was before in bg
-            job_in_list->Kill(SIGSTOP);
         }
         else { //never was in bg
             smash.jobs_list.addJob(job);
-            auto job_added = smash.jobs_list.getJobByPID(job.pid);
-            job_added->Kill(SIGSTOP);
+            job_in_list=smash.jobs_list.getJobByPID(job.pid);;
         }
-        smash.fg_job=JobEntry();
+        job_in_list->Kill(SIGSTOP);
         cout << "smash: process " << job.pid << " was stopped" << endl;
-        smash.fg_job = JobEntry();
+        smash.fg_job=JobEntry();//replace without delete
     }
 }
 
 void ctrlCHandler(int sig_num) {
     auto &smash = SmallShell::getInstance();
-    if (smash.pid != getpid()) {
+    /*if (smash.pid != getpid()) {
         do_kill(getpid(), SIGINT);
         return;
-    }
+    }*/
     cout << "smash: got ctrl-C"<<endl;
     auto &job = smash.fg_job;
+    auto job_in_list = smash.jobs_list.getJobByPID(job.pid);
     if(job.pid) {
         job.Kill(SIGKILL);
         cout << "smash: process " <<smash.fg_job.pid << " was killed" <<endl;
-        smash.replace_fg_and_wait(JobEntry());
+        if (job_in_list)  //was before in bg
+            smash.fg_job=JobEntry();//replace without delete
+        else
+            smash.replace_fg_and_wait(JobEntry());
     }
 }
 
@@ -52,4 +54,9 @@ void alarmHandler(int sig_num) {
     auto& smash=SmallShell::getInstance();
     smash.jobs_list.removeTimedoutJobs();
     smash.jobs_list.reset_timer();
+}
+void printHandler(int sig_num){
+    cout<<"---------------GOT SIGNAL---------------"<<endl;
+    cout<<"out:"<<sig_num<<endl;
+
 }

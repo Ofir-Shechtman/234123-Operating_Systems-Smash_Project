@@ -706,7 +706,7 @@ void ForegroundCommand::execute() {
     if(job == nullptr) throw FGJobIDDoesntExist(*job_id);
     job->Kill(SIGCONT);
     cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
-    smash.replace_fg_and_wait(JobEntry(job->cmd, job->pid));
+    smash.replace_fg_and_wait(JobEntry(nullptr, job->pid)); //job->cmd will delete from joblist
 }
 
 BackgroundCommand::BackgroundCommand(const char *cmd_line, vector<string> &args):
