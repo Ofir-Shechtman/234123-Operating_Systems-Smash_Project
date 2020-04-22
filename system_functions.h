@@ -10,9 +10,9 @@
 #include <signal.h>
 #include <istream>
 #include <stdexcept>
+#include "Commands.h"
 
-class Quit : public std::exception{};
-class Continue : public std::exception{};
+
 
 void do_perror(const char* syscall);
 int  do_open(const char* file, int flags);

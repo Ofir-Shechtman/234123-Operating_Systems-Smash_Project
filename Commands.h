@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <ctime>
+
 using std::string;
 using std::cout;
 using std::vector;
@@ -11,6 +12,8 @@ using std::vector;
 #define HISTORY_MAX_RECORDS (50)
 #define MAXINT 2147483647
 
+class Quit : public std::exception{};
+class Continue : public std::exception{};
 
 
 class Command {
@@ -61,32 +64,32 @@ class ExternalCommand : public Command {
 
 
 class PipeCommand : public Command {
-    Command* command1;
-    Command* command2;
+    string s_command1;
+    string s_command2;
     string sign;
 public:
       explicit PipeCommand(const char* cmd_line_c, string sign);
-      ~PipeCommand() override;
+      ~PipeCommand() override = default;;
       void execute() override;
 };
 
 class RedirectionCommand : public Command {
-    Command* cmd_left;
+    string cmd_left_line;
     string output_file;
     string IO_type;
  public:
   explicit RedirectionCommand(const char* cmd_line, const string&  IO_type);
-  ~RedirectionCommand() override;
+  ~RedirectionCommand() override= default;
   void execute() override;
 };
 
 class TimeoutCommand : public Command {
     int timer;
-    Command* cmd;
+    string cmd_s;
 public:
     explicit TimeoutCommand(const char* cmd_line, vector<string> args);
-    ~TimeoutCommand() override;
-    class TimerInvalidArgs: public std::exception{};
+    ~TimeoutCommand() override= default;
+    class TimerInvalidArgs: public Continue{};
     void execute() override;
 };
 
@@ -116,9 +119,9 @@ class ChangeDirCommand : public BuiltInCommand {
     string next_dir;
 public:
     explicit ChangeDirCommand(const char* cmd_line, vector<string>& args);
-    class TooManyArgs : public std::exception{};
-    class TooFewArgs : public std::exception{};
-    class NoOldPWD : public std::exception{};
+    class TooManyArgs : public Continue{};
+    class TooFewArgs : public Continue{};
+    class NoOldPWD : public Continue{};
     ~ChangeDirCommand() override = default;
     void execute() override;
 };
@@ -187,12 +190,12 @@ class KillCommand : public BuiltInCommand {
 public:
     KillCommand(const char *cmdLine1, vector<string> &args);
     ~KillCommand() override = default;
-    class KillJobIDDoesntExist: public std::exception{
+    class KillJobIDDoesntExist: public Continue{
     public:
         JobId job_id;
         explicit KillJobIDDoesntExist(JobId job_id);
     };
-    class KillInvalidArgs: public std::exception{};
+    class KillInvalidArgs: public Continue{};
     void execute() override;
 };
 
@@ -201,13 +204,13 @@ class ForegroundCommand : public BuiltInCommand {
  public:
     ForegroundCommand(const char* cmd_line, vector<string>& args);
     ~ForegroundCommand() override = default;
-    class FGJobIDDoesntExist: public std::exception{
+    class FGJobIDDoesntExist: public Continue{
     public:
         JobId job_id;
         explicit FGJobIDDoesntExist(JobId job_id);
     };
-    class FGEmptyJobsList: public std::exception{};
-    class FGInvalidArgs: public std::exception{};
+    class FGEmptyJobsList: public Continue{};
+    class FGInvalidArgs: public Continue{};
     void execute() override;
 };
 
@@ -217,32 +220,32 @@ public:
     BackgroundCommand(const char* cmd_line, vector<string>& args);
     ~BackgroundCommand() override = default;
     void execute() override;
-    class BGJobIDDoesntExist: public std::exception{
+    class BGJobIDDoesntExist: public Continue{
     public:
         JobId job_id;
         explicit BGJobIDDoesntExist(JobId job_id);
     };
-    class BGJobAlreadyRunning: public std::exception{
+    class BGJobAlreadyRunning: public Continue{
     public:
         JobId job_id;
         explicit BGJobAlreadyRunning(JobId job_id);
     };
-    class BGNoStoppedJobs: public std::exception{};
-    class BGInvalidArgs: public std::exception{};
+    class BGNoStoppedJobs: public Continue{};
+    class BGInvalidArgs: public Continue{};
 };
 
 
 // TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
-    const char* cmd_line{};
+    const char* cmd_line;
     vector<string> args;
  public:
     CopyCommand(const char* cmd_line, vector<string>& args);
     ~CopyCommand() override = default;
     void execute() override;
     static void copy(const char* infile, const char* outfile);
-    class CopyError: public std::exception{};
-    class CopyErrorFailedOpen: public std::exception{};
+    class CopyError: public Continue{};
+    class CopyErrorFailedOpen: public Continue{};
 };
 
 // TODO: add more classes if needed 

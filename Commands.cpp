@@ -173,47 +173,72 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
    Command* cmd= nullptr;
    try {
-        cmd = CreateCommand(cmd_line);
-        cmd->execute();
+       try {
+           cmd = CreateCommand(cmd_line);
+           cmd->execute();
+       }
+       catch (Quit &quit) {
+           jobs_list.deleteAll();
+           replace_fg_and_wait(JobEntry(nullptr));
+           delete cmd;
+           throw;
+       }
+       catch (ChangeDirCommand::TooManyArgs &tma) {
+           cerr << "smash error: cd: too many arguments" << endl;
+           throw;
+       }
+       catch (ChangeDirCommand::TooFewArgs &tfa) {
+           throw;
+       }
+       catch (ChangeDirCommand::NoOldPWD &nop) {
+           cerr << "smash error: cd: OLDPWD not set" << endl;
+           throw;
+       }
+       catch (KillCommand::KillInvalidArgs &kia) {
+           cerr << "smash error: kill: invalid arguments" << endl;
+           throw;
+       }
+       catch (KillCommand::KillJobIDDoesntExist &kill_job_doesnt_exist) {
+           cerr << "smash error: kill: job-id " << kill_job_doesnt_exist.job_id
+                << " does not exist" << endl;
+           throw;
+       }
+       catch (ForegroundCommand::FGEmptyJobsList &fgejl) {
+           cerr << "smash error: fg: jobs list is empty" << endl;
+           throw;
+       }
+       catch (ForegroundCommand::FGInvalidArgs &fia) {
+           cerr << "smash error: fg: invalid arguments" << endl;
+           throw;
+       }
+       catch (ForegroundCommand::FGJobIDDoesntExist &fg_job_doesnt_exist) {
+           cerr << "smash error: fg: job-id " << fg_job_doesnt_exist.job_id
+                << " does not exist" << endl;
+           throw;
+       }
+       catch (BackgroundCommand::BGJobIDDoesntExist &bg_job_doesnt_exist) {
+           cerr << "smash error: bg: job-id " << bg_job_doesnt_exist.job_id
+                << " does not exist" << endl;
+           throw;
+       }
+       catch (BackgroundCommand::BGJobAlreadyRunning &bg_job_already_running) {
+           cerr << "smash error: bg: job-id " << bg_job_already_running.job_id
+                << " is already running in the background" << endl;
+           throw;
+       }
+       catch (BackgroundCommand::BGNoStoppedJobs &bgnsj) {
+           cerr << "smash error: bg: there is no stopped jobs to resume"
+                << endl;
+           throw;
+       }
+       catch (BackgroundCommand::BGInvalidArgs &bia) {
+           cerr << "smash error: bg: invalid arguments" << endl;
+           throw;
+       }
    }
-   catch(Quit& quit) {
-       delete cmd;
-       throw quit;
-   }
-   catch(ChangeDirCommand::TooManyArgs& tma){
-       cerr<<"smash error: cd: too many arguments"<<endl;
-   }
-   catch(ChangeDirCommand::TooFewArgs& tfa){
-   }
-   catch(ChangeDirCommand::NoOldPWD& nop){
-       cerr<<"smash error: cd: OLDPWD not set"<<endl;
-   }
-   catch(KillCommand::KillInvalidArgs& kia){
-       cerr<<"smash error: kill: invalid arguments"<<endl;
-   }
-   catch(KillCommand::KillJobIDDoesntExist& kill_job_doesnt_exist){
-       cerr<<"smash error: kill: job-id "<<kill_job_doesnt_exist.job_id<<" does not exist"<<endl;
-   }
-   catch(ForegroundCommand::FGEmptyJobsList& fgejl){
-       cerr<<"smash error: fg: jobs list is empty"<<endl;
-   }
-   catch(ForegroundCommand::FGInvalidArgs& fia){
-       cerr<<"smash error: fg: invalid arguments"<<endl;
-   }
-   catch(ForegroundCommand::FGJobIDDoesntExist& fg_job_doesnt_exist) {
-       cerr << "smash error: fg: job-id " << fg_job_doesnt_exist.job_id << " does not exist" << endl;
-   }
-   catch(BackgroundCommand::BGJobIDDoesntExist& bg_job_doesnt_exist){
-       cerr<<"smash error: bg: job-id "<<bg_job_doesnt_exist.job_id<<" does not exist"<<endl;
-   }
-   catch(BackgroundCommand::BGJobAlreadyRunning& bg_job_already_running){
-       cerr<<"smash error: bg: job-id "<<bg_job_already_running.job_id<<" is already running in the background"<<endl;
-   }
-   catch(BackgroundCommand::BGNoStoppedJobs& bgnsj){
-       cerr<<"smash error: bg: there is no stopped jobs to resume"<<endl;
-   }
-   catch(BackgroundCommand::BGInvalidArgs& bia){
-       cerr<<"smash error: bg: invalid arguments"<<endl;
+   catch(Continue& e) {
+       replace_fg_and_wait(JobEntry(cmd));
+       throw;
    }
 }
 
@@ -246,8 +271,6 @@ void SmallShell::replace_fg_and_wait(JobEntry job) {
     fg_job.pid=0;
 
 }
-
-
 /*
 void SmallShell::set_min_time_job_pid(pid_t pid) {
     min_time_job_pid = pid;
@@ -304,8 +327,8 @@ void QuitCommand::execute() {
     auto& jobs_list=smash.jobs_list;
     if(args.size()>1 && args[1]=="kill")
         jobs_list.killAllJobs();
-    jobs_list.deleteAll();
-    smash.replace_fg_and_wait(JobEntry(this));
+    //                 jobs_list.deleteAll();
+    //NOW INSIDE QUIT! smash.replace_fg_and_wait(JobEntry(this));
     throw Quit();
 }
 
@@ -357,10 +380,8 @@ bool JobEntry::is_finish()  {
     if(!isDead) {
         pid_t res=do_waitpid(pid, nullptr, WNOHANG);
         isDead = res == pid || res==-1;
-        /*if (isDead)
-            delete cmd;*/
     }
-    return  isDead;//|| return_pid==-1;
+    return  isDead;
 }
 /*
 JobEntry::~JobEntry() {
@@ -638,7 +659,13 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, vector<string>& args) :
 void ChangeDirCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     char* prev_dir = get_current_dir_name();
-    do_chdir(next_dir.c_str());
+    try{
+        do_chdir(next_dir.c_str());
+    }
+    catch(Continue& e){
+        free(prev_dir);
+        throw;
+    }
     smash.set_prev_dir(prev_dir);
     free(prev_dir);
     smash.replace_fg_and_wait(JobEntry(this));
@@ -774,15 +801,14 @@ KillCommand::KillJobIDDoesntExist::KillJobIDDoesntExist(JobId job_id) :job_id(jo
 PipeCommand::PipeCommand(const char *cmd_line_c, string sign):
     Command(cmd_line_c, _isBackgroundComamnd(cmd_line_c)), sign(sign)
 {
-    string s_command1, s_command2;
     int sign_index = cmd_line.find(sign);
     string cmd_line_no_bg= _remove_bg_sign(cmd_line);
     s_command1 = cmd_line_no_bg.substr(0,sign_index);
     s_command2 = cmd_line_no_bg.substr(sign_index+sign.size(),string::npos);
-    command1 = SmallShell::CreateCommand(s_command1.c_str());
-    command2 = SmallShell::CreateCommand(s_command2.c_str());
-    command1->bg=false;
-    command2->bg=false;
+    //command1 = SmallShell::CreateCommand(s_command1.c_str());
+    //command2 = SmallShell::CreateCommand(s_command2.c_str());
+    //command1->bg=false;
+    //command2->bg=false;
 }
 
 void PipeCommand::execute() {
@@ -797,6 +823,8 @@ void PipeCommand::execute() {
             do_dup2(pipefd[1], fd);
             do_close(pipefd[1]);
             do_close(pipefd[0]);
+            auto command1 = smash.CreateCommand(s_command1.c_str());
+            command1->bg=false;
             command1->execute();
             throw Quit();
         } else {
@@ -806,6 +834,8 @@ void PipeCommand::execute() {
                 do_close(pipefd[0]);
                 do_close(pipefd[1]);
                 do_waitpid(child_pid1, nullptr, WUNTRACED);
+                auto command2 = smash.CreateCommand(s_command1.c_str());
+                command2->bg=false;
                 command2->execute();
                 throw Quit();
             } else {
@@ -822,14 +852,16 @@ void PipeCommand::execute() {
         smash.jobs_list.addJob(JobEntry(this, pipe_pid));
     } else {
         smash.replace_fg_and_wait(JobEntry(this, pipe_pid));
+        //delete command1;
+        //delete command2;
     }
 }
-
+/*
 PipeCommand::~PipeCommand() {
     delete command1;
     delete command2;
 }
-
+*/
 
 RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
                                        const string &IO_type) :
@@ -837,8 +869,7 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
     string sign= IO_type;
     string cmd_line_no_bg_str= _remove_bg_sign(cmd_line);
     int sign_loc=cmd_line_no_bg_str.find(sign);
-    string cmd_left_line=cmd_line_no_bg_str.substr(0, sign_loc);
-    cmd_left= SmallShell::CreateCommand(cmd_left_line.c_str());
+    cmd_left_line=cmd_line_no_bg_str.substr(0, sign_loc);
     output_file= cmd_line_no_bg_str.substr(sign_loc+sign.size()+1,  string::npos);
 }
 
@@ -853,6 +884,7 @@ void RedirectionCommand::execute() {
     pid_t child_pid = do_fork();
     if (child_pid == 0) {
         do_dup2(outfd, STDOUT_FILENO);
+        auto cmd_left= smash.CreateCommand(cmd_left_line.c_str());
         cmd_left->execute();
         throw Quit();
     }
@@ -867,12 +899,12 @@ void RedirectionCommand::execute() {
     }
     do_close(outfd);
 }
-
+/*
 RedirectionCommand::~RedirectionCommand() {
     delete cmd_left;
 
 }
-
+*/
 
 TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : Command(cmd_line_in, _isBackgroundComamnd(cmd_line_in)) {
     if (args.size()<3)
@@ -892,14 +924,14 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args) : C
         cmd_s += " " + args[i];
     }*/
     string cmd_line_no_bg = _remove_bg_sign(cmd_line);
-    string cmd_s = cmd_line_no_bg.substr(cmd_line_no_bg.find(args[2]), string::npos);
-    cmd = SmallShell::CreateCommand(cmd_s.c_str());
+    cmd_s = cmd_line_no_bg.substr(cmd_line_no_bg.find(args[2]), string::npos);
 }
 
 void TimeoutCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     pid_t child_pid= do_fork();
     if(child_pid==0) {
+        auto cmd = smash.CreateCommand(cmd_s.c_str());
         cmd->execute();
         throw Quit();
     }
@@ -913,11 +945,11 @@ void TimeoutCommand::execute() {
         }
     }
 }
-
+/*
 TimeoutCommand::~TimeoutCommand() {
     delete cmd;
 
-}
+}*/
 
 void JobsList::deleteAll() {
     for(auto job:list)
