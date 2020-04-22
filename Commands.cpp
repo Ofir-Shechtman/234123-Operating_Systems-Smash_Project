@@ -178,6 +178,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
            cmd->execute();
        }
        catch (Quit &quit) {
+           jobs_list.killAllStopedJobs();
            jobs_list.deleteAll();
            replace_fg_and_wait(JobEntry(nullptr));
            delete cmd;
@@ -423,6 +424,15 @@ void JobsList::killAllJobs() {
         job.Kill();
     }
 }
+
+void JobsList::killAllStopedJobs() {
+    removeFinishedJobs();
+    for(auto& job_id : last_stopped_jobs){
+        auto job=getJobByJobID(job_id);
+        job->Kill();
+    }
+}
+
 
 void JobsList::removeFinishedJobs() {
     for(auto job=list.begin(); job!=list.end();) {
@@ -955,3 +965,4 @@ void JobsList::deleteAll() {
     for(auto job:list)
         delete job.cmd;
 }
+

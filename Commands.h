@@ -152,6 +152,7 @@ public:
   void addJob(JobEntry);
   void printJobsList() const;
   void killAllJobs();
+  void killAllStopedJobs();
   void removeFinishedJobs();
   void deleteAll();
   JobEntry * getJobByPID(pid_t);
@@ -161,7 +162,7 @@ public:
   JobEntry *getLastStoppedJob();
   void pushToStopped(JobId);
   void removeFromStopped(JobId);
-  void remove(vector<JobEntry>::iterator it);
+  //void remove(vector<JobEntry>::iterator it);
 /*
   void addTimedJob(JobId);
   void removeTimedoutJob(JobId job_id = 0);
