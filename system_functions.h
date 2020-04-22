@@ -15,7 +15,7 @@
 
 
 void do_perror(const char* syscall);
-int  do_open(const char* file, int flags);
+int  do_open(const char* file, unsigned int flags);
 int  do_read(int fd, char* buffer, int BUFSIZE);
 int  do_write(int df, char* buffer, int n);
 void do_close(int fd);

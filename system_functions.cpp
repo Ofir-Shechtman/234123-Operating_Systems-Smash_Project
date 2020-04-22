@@ -1,5 +1,4 @@
 #include "system_functions.h"
-#include "Commands.h"
 
 
 void do_perror(const char* syscall) {
@@ -20,7 +19,7 @@ void do_close(int fd)
     }
 }
 
-int do_open(const char *file, int flags) {
+int do_open(const char *file, unsigned int flags) {
     mode_t perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; /*rw-rw-rw-*/
     int fd=open(file, flags, perms);
     if(fd == -1) {

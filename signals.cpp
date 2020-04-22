@@ -1,16 +1,11 @@
-#include <iostream>
-#include <signal.h>
-#include <sstream>
 #include "signals.h"
-#include "Commands.h"
-#include "system_functions.h"
+
 
 using namespace std;
 
 void ctrlZHandler(int sig_num) {
     auto &smash = SmallShell::getInstance();
     if(smash.pid!=getpid()){
-       // do_kill(getpid(), SIGSTOP);
         return;
     }
     cout << "smash: got ctrl-Z" << endl;
@@ -33,10 +28,6 @@ void ctrlZHandler(int sig_num) {
 
 void ctrlCHandler(int sig_num) {
     auto &smash = SmallShell::getInstance();
-    /*if (smash.pid != getpid()) {
-        do_kill(getpid(), SIGINT);
-        return;
-    }*/
     cout << "smash: got ctrl-C"<<endl;
     auto &job = smash.fg_job;
     auto job_in_list = smash.jobs_list.getJobByPID(job.pid);
@@ -52,11 +43,6 @@ void ctrlCHandler(int sig_num) {
 
 void alarmHandler(int sig_num) {
     auto& smash=SmallShell::getInstance();
-    smash.jobs_list.removeTimedoutJobs();
+    smash.jobs_list.removeTimeoutJobs();
     smash.jobs_list.reset_timer();
-}
-void printHandler(int sig_num){
-    cout<<"---------------GOT SIGNAL---------------"<<endl;
-    cout<<"out:"<<sig_num<<endl;
-
 }

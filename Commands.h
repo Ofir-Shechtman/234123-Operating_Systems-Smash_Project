@@ -3,6 +3,13 @@
 
 #include <vector>
 #include <ctime>
+#include <cstring>
+#include <iostream>
+#include <vector>
+#include <sstream>
+#include <fcntl.h>
+#include <csignal>
+#include "system_functions.h"
 
 using std::string;
 using std::cout;
@@ -17,7 +24,6 @@ class Continue : public std::exception{};
 
 
 class Command {
-// TODO: Add your data members
 protected:
   const string cmd_line;
 public:
@@ -25,7 +31,6 @@ public:
   explicit Command(const char* cmd_line, bool bg);
   virtual ~Command()= default;;
   virtual void execute() = 0;
-  //string getCommand() const;
   string get_cmd_line() const;
 };
 
@@ -68,7 +73,7 @@ class PipeCommand : public Command {
     string s_command2;
     string sign;
 public:
-      explicit PipeCommand(const char* cmd_line_c, string sign);
+      explicit PipeCommand(const char* cmd_line_c, const string& sign);
       ~PipeCommand() override = default;;
       void execute() override;
 };
@@ -144,7 +149,6 @@ private:
 
   std::vector<JobEntry> list;
   vector<JobId> last_stopped_jobs;
-  vector<JobId> timed_jobs;
   JobId allocJobId() const;
 public:
   JobsList()= default;
@@ -157,19 +161,12 @@ public:
   void deleteAll();
   JobEntry * getJobByPID(pid_t);
   JobEntry * getJobByJobID(JobId);
-  //void removeJobById(JobId);
   JobEntry * getLastJob(const JobId* lastJobId= nullptr);
   JobEntry *getLastStoppedJob();
   void pushToStopped(JobId);
   void removeFromStopped(JobId);
-  //void remove(vector<JobEntry>::iterator it);
-/*
-  void addTimedJob(JobId);
-  void removeTimedoutJob(JobId job_id = 0);
-  void removeFinishedTimedjobs(JobId job_id = 0);
-  void setAlarmTimer();*/
 
-  void removeTimedoutJobs();
+  void removeTimeoutJobs();
   void reset_timer(int new_timer=0);
 
   bool empty() const;
@@ -178,7 +175,6 @@ public:
 };
 
 class JobsCommand : public BuiltInCommand {
- // TODO: Add your data members
  public:
   explicit JobsCommand(const char* cmd_line);
   ~JobsCommand() override = default;
@@ -236,36 +232,24 @@ public:
 };
 
 
-// TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
-    const char* cmd_line;
     vector<string> args;
  public:
     CopyCommand(const char* cmd_line, vector<string>& args);
     ~CopyCommand() override = default;
     void execute() override;
     static void copy(const char* infile, const char* outfile);
-    class CopyError: public Continue{};
-    class CopyErrorFailedOpen: public Continue{};
 };
 
-// TODO: add more classes if needed 
-// maybe chprompt , timeout ?
 
 class SmallShell {
 public:
-  // TODO: Add your data members
   string prompt;
   pid_t pid;
   string prev_dir;
-  //pid_t min_time_job_pid;
   JobEntry fg_job;
-  //int fg_timer;
-  //pid_t fg_pid;
-  //Command* fg_cmd;
   JobsList jobs_list;
   SmallShell();
- //public:
   static Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
@@ -283,8 +267,6 @@ public:
   string get_prev_dir() const;
   void set_prev_dir(string new_dir);
   void replace_fg_and_wait(JobEntry job = JobEntry());
-  //void set_min_time_job_pid(pid_t pid);
-  // TODO: add extra methods as needed
 };
 
 #endif //SMASH_COMMAND_H_
