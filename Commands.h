@@ -28,6 +28,7 @@ protected:
   const string cmd_line;
 public:
   bool bg;
+  int create_time;
   explicit Command(const char* cmd_line, bool bg);
   virtual ~Command()= default;;
   virtual void execute() = 0;
@@ -48,6 +49,7 @@ struct JobEntry {
     bool is_finish();
     ~JobEntry()= default;
     int run_time() const;
+    int JobEntry::time_in_list() const;
     int time_left() const;
     void timeout();
     friend std::ostream& operator<<(std::ostream& os, const JobEntry& job);
