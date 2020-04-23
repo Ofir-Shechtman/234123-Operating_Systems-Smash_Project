@@ -88,6 +88,8 @@ class RedirectionCommand : public Command {
   explicit RedirectionCommand(const char* cmd_line, const string&  IO_type);
   ~RedirectionCommand() override= default;
   void execute() override;
+  void execute_built_in();
+  void execute_external();
 };
 
 class TimeoutCommand : public Command {

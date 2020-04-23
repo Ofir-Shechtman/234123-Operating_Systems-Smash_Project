@@ -761,6 +761,18 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
 
 void RedirectionCommand::execute() {
     auto &smash = SmallShell::getInstance();
+    auto cmd = smash.CreateCommand(cmd_left_line.c_str());
+    auto external= dynamic_cast<ExternalCommand*>(cmd);
+    if(external)
+        execute_external();
+    else
+        execute_built_in();
+    delete cmd;
+
+}
+
+void RedirectionCommand::execute_external() {
+    auto &smash = SmallShell::getInstance();
     unsigned int dest_flags = 0;
     if (IO_type == ">")
         dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
@@ -783,6 +795,25 @@ void RedirectionCommand::execute() {
     }
     do_close(outfd);
 }
+
+void RedirectionCommand::execute_built_in() {
+    auto &smash = SmallShell::getInstance();
+    unsigned int dest_flags = 0;
+    if (IO_type == ">")
+        dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
+    else if (IO_type == ">>")
+        dest_flags = O_CREAT | O_RDWR | O_APPEND;
+    int outfd = do_open(output_file.c_str(), dest_flags);
+    int temp_stdout=4;
+    do_dup2(STDOUT_FILENO, temp_stdout);
+    do_dup2(outfd, STDOUT_FILENO);
+    auto cmd_left = smash.CreateCommand(cmd_left_line.c_str());
+    cmd_left->execute();
+    smash.replace_fg_and_wait(JobEntry(this));
+    do_dup2(temp_stdout, STDOUT_FILENO);
+
+}
+
 
 TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args)
         : Command(cmd_line_in, _isBackgroundComamnd(cmd_line_in)) {
