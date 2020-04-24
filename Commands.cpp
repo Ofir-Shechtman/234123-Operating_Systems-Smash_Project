@@ -105,7 +105,6 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     string cmd_s = string(cmd_line);
     if (args.empty())
         return new ExternalCommand(cmd_line);
-
     else if (cmd_s.find(">>") != string::npos) {
         return new RedirectionCommand(cmd_line, ">>");
     } else if (cmd_s.find('>') != string::npos) {
@@ -380,7 +379,7 @@ JobId JobsList::allocJobId() const {
 
 void JobsList::killAllJobs() {
     removeFinishedJobs();
-    cout << "smash: sending SIGKILL signals to " << list.size() << " jobs:"
+    cout << "smash: sending SIGKILL signal to " << list.size() << " jobs:"
          << endl;
     for (auto &job : list) {
         cout << job.pid << ": " << job.cmd->get_cmd_line() << endl;
@@ -726,7 +725,7 @@ void PipeCommand::execute() {
                 do_dup2(pipefd[0], STDIN_FILENO);
                 do_close(pipefd[0]);
                 do_close(pipefd[1]);
-                do_waitpid(child_pid1, nullptr, WUNTRACED);
+                //do_waitpid(child_pid1, nullptr, WUNTRACED);
                 auto command2 = smash.CreateCommand(s_command2.c_str());
                 command2->bg = false;
                 command2->execute();
