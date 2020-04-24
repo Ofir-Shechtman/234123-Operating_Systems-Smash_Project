@@ -100,6 +100,8 @@ public:
     ~TimeoutCommand() override= default;
     class TimerInvalidArgs: public Continue{};
     void execute() override;
+    void execute_built_in();
+    void execute_external();
 };
 
 class ChangePromptCommand : public BuiltInCommand {

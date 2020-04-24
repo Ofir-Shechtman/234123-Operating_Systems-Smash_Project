@@ -1,0 +1,5 @@
+showpid > pid2.txt
+cat pid.txt
+
+cat pid2.txt
+quit kill

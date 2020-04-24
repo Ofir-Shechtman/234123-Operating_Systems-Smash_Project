@@ -767,7 +767,6 @@ void RedirectionCommand::execute() {
     else
         execute_built_in();
     delete cmd;
-
 }
 
 void RedirectionCommand::execute_external() {
@@ -810,7 +809,6 @@ void RedirectionCommand::execute_built_in() {
     cmd_left->execute();
     smash.replace_fg_and_wait(JobEntry(this));
     do_dup2(temp_stdout, STDOUT_FILENO);
-
 }
 
 
@@ -832,6 +830,25 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args)
 }
 
 void TimeoutCommand::execute() {
+    SmallShell &smash = SmallShell::getInstance();
+    auto cmd = smash.CreateCommand(cmd_s.c_str());
+    auto external= dynamic_cast<ExternalCommand*>(cmd);
+    if(external)
+        execute_external();
+    else
+        execute_built_in();
+    delete cmd;
+}
+
+void TimeoutCommand::execute_built_in() {
+    SmallShell &smash = SmallShell::getInstance();
+    auto cmd = smash.CreateCommand(cmd_s.c_str());
+    cmd->execute();
+    smash.jobs_list.reset_timer(timer);
+    smash.replace_fg_and_wait(JobEntry(this));
+}
+
+void TimeoutCommand::execute_external() {
     SmallShell &smash = SmallShell::getInstance();
     pid_t child_pid = do_fork();
     if (child_pid == 0) {
