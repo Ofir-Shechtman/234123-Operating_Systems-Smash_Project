@@ -2,6 +2,7 @@
 #include <csignal>
 #include "Commands.h"
 #include "signals.h"
+#include "system_functions.h"
 
 
 int main(int argc, char *argv[]) {
@@ -29,7 +30,9 @@ int main(int argc, char *argv[]) {
             smash.executeCommand(cmd_line.c_str());
         }
         catch (Continue &) {
-            continue;
+            if(smash.is_smash())
+                continue;
+            break;
         }
         catch (Quit &) {
             break;

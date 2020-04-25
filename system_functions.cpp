@@ -1,6 +1,10 @@
 #include "system_functions.h"
 
 
+static bool is_smash(){
+    return SmallShell::getInstance().is_smash();
+}
+
 void do_perror(const char* syscall) {
     std::string msg="smash error: ";
     msg+=syscall;
@@ -46,9 +50,6 @@ int do_write(int df, char *buffer, int n) {
     return 0;
 }
 
-static bool is_smash(){
-    return SmallShell::getInstance().pid==getpid();
-}
 
 int do_fork() {
     int child = fork();
@@ -123,3 +124,4 @@ int do_stoi(std::string num) {
         throw std::invalid_argument(num);
     return value;
 }
+

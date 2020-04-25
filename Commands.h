@@ -273,6 +273,7 @@ public:
   string get_prev_dir() const;
   void set_prev_dir(string new_dir);
   void replace_fg_and_wait(JobEntry job = JobEntry());
+  bool is_smash() const;
 };
 
 #endif //SMASH_COMMAND_H_

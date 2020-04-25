@@ -244,6 +244,7 @@ void SmallShell::replace_fg_and_wait(JobEntry job) {
 
 }
 
+
 Command::Command(const char *cmd_line, bool bg) :
         cmd_line(cmd_line), bg(bg), create_time(time(nullptr)) {
 }
@@ -868,4 +869,8 @@ void TimeoutCommand::execute_external() {
 void JobsList::deleteAll() {
     for (auto job:list)
         delete job.cmd;
+}
+
+bool SmallShell::is_smash() const {
+    return pid==getpid();
 }
