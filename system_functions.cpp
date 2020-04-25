@@ -46,15 +46,17 @@ int do_write(int df, char *buffer, int n) {
     return 0;
 }
 
+static bool is_smash(){
+    return SmallShell::getInstance().pid==getpid();
+}
+
 int do_fork() {
-    SmallShell& smash= SmallShell::getInstance();
-    bool pgrp=smash.pid==getpid();
     int child = fork();
     if(child<0) {
         do_perror("fork");
         throw Continue();
     }
-    else if(child==0 && pgrp)
+    else if(child==0 && is_smash())
         setpgrp();
     return child;
 }
@@ -83,10 +85,14 @@ void do_execvp(const char* cmd) {
 }
 
 int do_kill(pid_t pid, int signal) {
-    int res=killpg(pid, signal);
+    int res=0;
+    if(is_smash())
+        res=kill(pid, signal);
+    else
+        res=killpg(pid, signal);
     if(res!=0) {
         do_perror("kill");
-        //throw Continue();
+        throw Continue();
     }
     return res;
 }
@@ -99,10 +105,14 @@ void do_chdir(const char *path) {
 
 }
 
-pid_t  do_waitpid(pid_t pid, int *stat_loc, int options){
-    if(pid)
-        return waitpid(pid, stat_loc, options);
-    return 0;
+pid_t  do_waitpid(pid_t pid, int *status, int options){
+    pid_t ret_pid=0;
+    if(pid) {
+        ret_pid = waitpid(pid, status, options);
+        if (!is_smash() && (WIFSTOPPED(*status) || WIFCONTINUED(*status)) && options==WUNTRACED)
+            return do_waitpid(pid, status, options);
+    }
+    return ret_pid;
 }
 
 int do_stoi(std::string num) {
