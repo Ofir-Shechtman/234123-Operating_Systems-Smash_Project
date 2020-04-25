@@ -6,15 +6,19 @@
 
 int main(int argc, char *argv[]) {
     setbuf(stdout, nullptr); //TODO remove
+    struct sigaction alarm = {{alarmHandler}};
+    alarm.sa_flags = SA_RESTART;
+    alarm.sa_handler = alarmHandler;
+    if (sigaction(SIGALRM, &alarm,nullptr) == -1) {
+        perror("smash error: failed to set alarm handler");
+    }
     if (signal(SIGTSTP, ctrlZHandler) == SIG_ERR) {
         perror("smash error: failed to set ctrl-Z handler");
     }
     if (signal(SIGINT, ctrlCHandler) == SIG_ERR) {
         perror("smash error: failed to set ctrl-C handler");
     }
-    if (signal(SIGALRM, alarmHandler) == SIG_ERR) {
-        perror("smash error: failed to set ctrl-C handler");//TODO:change
-    }
+
     SmallShell &smash = SmallShell::getInstance();
     while (true) {
         //std::cout<<"\x1B[1;36m"<<smash.get_prompt()<< "> " << "\x1B[0m";
