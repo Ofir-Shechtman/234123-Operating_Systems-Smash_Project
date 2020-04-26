@@ -33,7 +33,7 @@ string _rtrim(const std::string &s) {
 string _trim(const std::string &s) {
     return _rtrim(_ltrim(s));
 }
-
+/*
 int _parseCommandLine(const char *cmd_line, char **args) {
     FUNC_ENTRY()
     int i = 0;
@@ -46,7 +46,7 @@ int _parseCommandLine(const char *cmd_line, char **args) {
     }
     return i;
     FUNC_EXIT()
-}
+}*/
 
 vector<string> _parseCommandLine(const char *cmd_line) {
     FUNC_ENTRY()
@@ -294,8 +294,10 @@ QuitCommand::QuitCommand(const char *cmd_line, vector<string> &args)
 void QuitCommand::execute() {
     auto &smash = SmallShell::getInstance();
     auto &jobs_list = smash.jobs_list;
-    if (args.size() > 1 && args[1] == "kill")
-        jobs_list.killAllJobs();
+    for(auto arg : args){
+        if (arg == "kill")
+            jobs_list.killAllJobs();
+    }
     //                 jobs_list.deleteAll();
     //NOW INSIDE QUIT! smash.replace_fg_and_wait(JobEntry(this));
     throw Quit();
@@ -578,6 +580,8 @@ void ForegroundCommand::execute() {
             throw FGInvalidArgs();
         }
     }
+    if(*job_id<1)
+        throw FGInvalidArgs();
     auto job = smash.jobs_list.getLastJob(job_id);
     if (job == nullptr) throw FGJobIDDoesntExist(*job_id);
     job->Kill(SIGCONT);
@@ -609,6 +613,8 @@ void BackgroundCommand::execute() {
             throw BGInvalidArgs();
         }
     }
+    if(*job_id<1)
+        throw BGInvalidArgs();
     auto job = smash.jobs_list.getLastStoppedJob();
     if (args.size() == 1) {
         if (job == nullptr) throw BGNoStoppedJobs();
@@ -625,6 +631,8 @@ void BackgroundCommand::execute() {
 
 void CopyCommand::copy(const char *infile, const char *outfile) {
 
+    if(string(infile)==string(outfile))
+        return;
     const int BUFSIZE = 4096;
     int infd, outfd;
     int n;
@@ -659,6 +667,7 @@ void CopyCommand::execute() {
         copy(args[1].c_str(), args[2].c_str());
         throw Quit();
     } else {
+        cout << "smash: "<<args[1]<<" was copied to " << args[1] << endl;
         if (bg)
             SmallShell::getInstance().jobs_list.addJob(
                     JobEntry(this, child_pid));
@@ -679,7 +688,7 @@ KillCommand::KillCommand(const char *cmdLine1, vector<string> &args)
     catch (std::invalid_argument const &e) {
         throw KillInvalidArgs();
     }
-    if (sig_num < 1 || sig_num > 31)
+    if (sig_num < 1 || sig_num > 31 || job_id<1)
         throw KillInvalidArgs();
 }
 
@@ -755,8 +764,9 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
     string cmd_line_no_bg_str = _remove_bg_sign(cmd_line);
     int sign_loc = cmd_line_no_bg_str.find(IO_type);
     cmd_left_line = cmd_line_no_bg_str.substr(0, sign_loc);
-    output_file = cmd_line_no_bg_str.substr(sign_loc + IO_type.size() + 1,
+    string output_file_full = cmd_line_no_bg_str.substr(sign_loc + IO_type.size() + 1,
                                             string::npos);
+    output_file = _parseCommandLine(output_file_full.c_str())[0];
 }
 
 void RedirectionCommand::execute() {

@@ -37,6 +37,11 @@ int main(int argc, char *argv[]) {
         catch (Quit &) {
             break;
         }
+        catch(std::bad_alloc& e) {
+            if (smash.is_smash())
+                continue;
+            break;
+        }
     }
     return 0;
 }
