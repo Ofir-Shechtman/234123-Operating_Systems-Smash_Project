@@ -207,6 +207,10 @@ void SmallShell::executeCommand(const char *cmd_line) {
             cerr << "smash error: bg: invalid arguments" << endl;
             throw;
         }
+        catch (TimeoutCommand::TimerInvalidArgs &tia){
+            cerr << "smash error: timout: invalid arguments" << endl;
+            throw;
+        }
     }
     catch (Continue &e) {
         replace_fg_and_wait(JobEntry(cmd));
@@ -833,7 +837,7 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line_in, vector<string> args)
     catch (std::invalid_argument const &e) {
         throw TimerInvalidArgs();
     }
-    if (timer < 0) {
+    if (timer <= 0) {
         throw TimerInvalidArgs();
     }
     string cmd_line_no_bg = _remove_bg_sign(cmd_line);

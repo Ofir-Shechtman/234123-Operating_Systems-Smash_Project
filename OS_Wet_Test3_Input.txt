@@ -1,5 +1,34 @@
 showpid > pid2.txt
-cat pid.txt
-
+cat pid2.txt
+showpid >> pid2.txt
+cat pid2.txt
+ls -l > ls2.txt
+cat ls2.txt
+cat pid2.txt | grep smash
+showpid | grep smash
+cd - |& pwd
+sleep 500 |& sleep 600 &
+sleep 300 >> sleep 400
+Ctrl-Z
+jobs
+fg
+Ctrl-C
+jobs
+fg 1
+Ctrl-Z
+jobs
+bg
+jobs
+fg
+Ctrl-C
+jobs
+cp pid2.txt aaa.txt
+cat aaa.txt
+cp pid2.txt ls2.txt
+cat ls2.txt
+diff aaa.txt ls2.txt
+cp bbb.txt pis2.txt
+cp bbb.txt pid2.txt
+cp pid2.txt pid2.txt
 cat pid2.txt
 quit kill
