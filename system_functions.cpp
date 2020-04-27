@@ -106,13 +106,15 @@ void do_chdir(const char *path) {
 
 }
 
-pid_t  do_waitpid(pid_t pid, int *status, int options){
+pid_t  do_waitpid(pid_t pid, int options){
     pid_t ret_pid=0;
-    if(pid) {
-        ret_pid = waitpid(pid, status, options);
-        if (!is_smash() && (WIFSTOPPED(*status) || WIFCONTINUED(*status)) && options==WUNTRACED)
-            return do_waitpid(pid, status, options);
-    }
+    int status;
+    if(pid)
+        do {
+            ret_pid = waitpid(pid, &status, options);
+        }
+        while
+        (!is_smash() && (WIFSTOPPED(status) || WIFCONTINUED(status)) && options==WUNTRACED);
     return ret_pid;
 }
 
@@ -124,4 +126,3 @@ int do_stoi(std::string num) {
         throw std::invalid_argument(num);
     return value;
 }
-

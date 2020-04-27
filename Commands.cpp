@@ -239,7 +239,7 @@ void SmallShell::replace_fg_and_wait(JobEntry job) {
     auto &shell_fg_job = fg_job;
     delete shell_fg_job.cmd;
     shell_fg_job = JobEntry(job);
-    do_waitpid(shell_fg_job.pid, nullptr, WUNTRACED);
+    do_waitpid(shell_fg_job.pid, WUNTRACED);
     shell_fg_job.pid = 0;
 
 }
@@ -350,7 +350,7 @@ int JobEntry::Kill(int signal) {
 
 bool JobEntry::is_finish() {
     if (!isDead) {
-        pid_t res = do_waitpid(pid, nullptr, WNOHANG);
+        pid_t res = do_waitpid(pid, WNOHANG);
         isDead = res == pid || res == -1;
     }
     return isDead;
@@ -728,26 +728,25 @@ void PipeCommand::execute() {
             auto command1 = smash.CreateCommand(s_command1.c_str());
             command1->bg = false;
             command1->execute();
-            throw Quit();
-        } else {
-            pid_t child_pid2 = do_fork();
-            if (child_pid2 == 0) {
-                do_dup2(pipefd[0], STDIN_FILENO);
-                do_close(pipefd[0]);
-                do_close(pipefd[1]);
-                //do_waitpid(child_pid1, nullptr, WUNTRACED);
-                auto command2 = smash.CreateCommand(s_command2.c_str());
-                command2->bg = false;
-                command2->execute();
-                throw Quit();
-            } else {
-                do_close(pipefd[0]);
-                do_close(pipefd[1]);
-            }
-            do_waitpid(child_pid1, nullptr, WUNTRACED);
-            do_waitpid(child_pid2, nullptr, WUNTRACED);
+            delete command1;
             throw Quit();
         }
+        pid_t child_pid2 = do_fork();
+        if (child_pid2 == 0) {
+            do_dup2(pipefd[0], STDIN_FILENO);
+            do_close(pipefd[0]);
+            do_close(pipefd[1]);
+            auto command2 = smash.CreateCommand(s_command2.c_str());
+            command2->bg = false;
+            command2->execute();
+            delete command2;
+            throw Quit();
+        }
+        do_close(pipefd[0]);
+        do_close(pipefd[1]);
+        do_waitpid(child_pid1, WUNTRACED);
+        do_waitpid(child_pid2, WUNTRACED);
+        throw Quit();
     }
 
     if (bg) {

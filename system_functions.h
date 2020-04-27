@@ -26,7 +26,7 @@ int  do_kill(pid_t pid, int signal);
 void do_chdir(const char* path);
 void do_pipe(int* fds);
 void do_dup2(int fd, int fd_replace);
-pid_t do_waitpid(pid_t pid, int *stat_loc, int options);
+pid_t do_waitpid(pid_t pid, int options);
 
 
 #endif //SMASH_SYSTEM_FUNCS_H
