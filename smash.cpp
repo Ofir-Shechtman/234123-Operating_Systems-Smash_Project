@@ -38,8 +38,10 @@ int main(int argc, char *argv[]) {
             break;
         }
         catch(std::bad_alloc& e) {
-            if (smash.is_smash())
+            if (smash.is_smash()){
+                do_perror("allocation");
                 continue;
+            }
             break;
         }
     }

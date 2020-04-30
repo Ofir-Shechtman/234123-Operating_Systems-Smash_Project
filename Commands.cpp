@@ -208,7 +208,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
             throw;
         }
         catch (TimeoutCommand::TimerInvalidArgs &tia){
-            cerr << "smash error: timout: invalid arguments" << endl;
+            cerr << "smash error: timeout: invalid arguments" << endl;
             throw;
         }
     }
@@ -361,7 +361,6 @@ bool JobEntry::is_finish() {
 }
 
 void JobEntry::timeout() {
-    cout << "smash: got an alarm" << endl;
     cout << "smash: " << cmd->get_cmd_line() << " timed out!"
          << endl;
     Kill();
@@ -447,7 +446,7 @@ JobEntry *JobsList::getLastJob(const JobId *lastJobId) {
 
 JobEntry *JobsList::getLastStoppedJob() {
     if (last_stopped_jobs.empty()) return nullptr;
-    auto job = getJobByJobID(last_stopped_jobs.front());
+    auto job = getJobByJobID(last_stopped_jobs.back());
     return job;
 }
 
@@ -584,7 +583,7 @@ void ForegroundCommand::execute() {
             throw FGInvalidArgs();
         }
     }
-    if(*job_id<1)
+    if(job_id && *job_id<1)
         throw FGInvalidArgs();
     auto job = smash.jobs_list.getLastJob(job_id);
     if (job == nullptr) throw FGJobIDDoesntExist(*job_id);
@@ -617,7 +616,7 @@ void BackgroundCommand::execute() {
             throw BGInvalidArgs();
         }
     }
-    if(*job_id<1)
+    if(job_id && *job_id<1)
         throw BGInvalidArgs();
     auto job = smash.jobs_list.getLastStoppedJob();
     if (args.size() == 1) {

@@ -2,7 +2,7 @@ from subprocess import Popen, PIPE
 from signal import SIGKILL, SIGTSTP, SIGINT
 from errno import ETIME
 import psutil
-from time import sleep
+import time
 import sys
 from tempfile import mkstemp
 from shutil import move, copymode
@@ -78,7 +78,7 @@ class SmashRunner:
                                    stderr=PIPE,  # STDOUT,
                                    shell=True,
                                    universal_newlines=True)
-        sleep(0.05)
+        time.sleep(0.05)
         self.smash_process = None
         smashes = getProcess(process_name)
         if len(smashes) > 1:
@@ -109,9 +109,9 @@ class SmashRunner:
         #   time.sleep(int(command.split()[1]) + 1)
 
     def signal(self, signum):
-        sleep(0.05)
+        time.sleep(0.05)
         self.smash_process.send_signal(signum)
-        sleep(0.05)
+        time.sleep(0.05)
         self.last = self.NONE[:]
 
     def close(self):
@@ -175,14 +175,19 @@ class SmashRunner:
     def run(self):
         lines = self.test_file.read().splitlines()
         for i, line in enumerate(lines):
-            if line not in ["Ctrl-Z", "Ctrl-C"]:
-                self.read_and_wait()
+            if line.startswith("#"):
+                continue
+            if line.startswith("!"):
+                exec(line[1:])
+                continue
+            elif line not in ["Ctrl-Z", "Ctrl-C", "CtrlZ", "CtrlC"]:
+                self.read()#_and_wait()
             else:
                 self.read()
-            if line.startswith("Ctrl-Z"):
+            if line.startswith(("Ctrl-Z", "CtrlZ")):
                 self.signal(SIGTSTP)
                 continue
-            elif line.startswith("Ctrl-C"):
+            elif line.startswith(("Ctrl-C", "CtrlC")):
                 self.signal(SIGINT)
                 continue
             else:

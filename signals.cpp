@@ -42,6 +42,7 @@ void ctrlCHandler(int sig_num) {
 }
 
 void alarmHandler(int sig_num) {
+    cout << "smash: got an alarm" << endl;
     auto& smash=SmallShell::getInstance();
     smash.jobs_list.removeTimeoutJobs();
     smash.jobs_list.reset_timer();
