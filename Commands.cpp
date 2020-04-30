@@ -105,36 +105,52 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     string cmd_s = string(cmd_line);
     if (args.empty())
         return new ExternalCommand(cmd_line);
+
     else if (cmd_s.find(">>") != string::npos) {
         return new RedirectionCommand(cmd_line, ">>");
+
     } else if (cmd_s.find('>') != string::npos) {
         return new RedirectionCommand(cmd_line, ">");
+
     } else if (cmd_s.find("|&") != string::npos) {
         return new PipeCommand(cmd_line, "|&");
+
     } else if (cmd_s.find('|') != string::npos) {
         return new PipeCommand(cmd_line, "|");
+
     } else if (args[0] == "timeout") {
         return new TimeoutCommand(cmd_line, args);
+
     } else if (args[0] == "chprompt") {
         return new ChangePromptCommand(cmd_line, args);
+
     } else if (args[0] == "showpid") {
         return new ShowPidCommand(cmd_line);
+
     } else if (args[0] == "pwd") {
         return new GetCurrDirCommand(cmd_line);
+
     } else if (args[0] == "cd") {
         return new ChangeDirCommand(cmd_line, args);
+
     } else if (args[0] == "kill") {
         return new KillCommand(cmd_line, args);
+
     } else if (args[0] == "quit") {
         return new QuitCommand(cmd_line, args);
+
     } else if (args[0] == "jobs") {
         return new JobsCommand(cmd_line);
+
     } else if (args[0] == "fg") {
         return new ForegroundCommand(cmd_line, args);
+
     } else if (args[0] == "bg") {
         return new BackgroundCommand(cmd_line, args);
+
     } else if (args[0] == "cp") {
         return new CopyCommand(cmd_line, args);
+
     } else {
         return new ExternalCommand(cmd_line);
     }
@@ -661,7 +677,7 @@ CopyCommand::CopyCommand(const char *cmd_line, vector<string> &args) :
 
 void CopyCommand::execute() {
     if (args.size() != 3) {
-        cout << "smash error: fg: invalid arguments" << endl;
+        cout << "smash error: copy: invalid arguments" << endl;
         return;
     }
     SmallShell &smash = SmallShell::getInstance();
@@ -766,30 +782,39 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line_c,
     string cmd_line_no_bg_str = _remove_bg_sign(cmd_line);
     int sign_loc = cmd_line_no_bg_str.find(IO_type);
     cmd_left_line = cmd_line_no_bg_str.substr(0, sign_loc);
-    string output_file_full = cmd_line_no_bg_str.substr(sign_loc + IO_type.size() + 1,
+    string output_file_full = cmd_line_no_bg_str.substr(sign_loc + IO_type.size(),
                                             string::npos);
-    output_file = _parseCommandLine(output_file_full.c_str())[0];
+    string output_file = _parseCommandLine(output_file_full.c_str())[0];
+    unsigned int dest_flags = 0;
+    if (IO_type == ">")
+        dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
+    else if (IO_type == ">>")
+        dest_flags = O_CREAT | O_RDWR | O_APPEND;
+    outfd = do_open(output_file.c_str(), dest_flags);
 }
 
 void RedirectionCommand::execute() {
     auto &smash = SmallShell::getInstance();
-    auto cmd = smash.CreateCommand(cmd_left_line.c_str());
+    Command* cmd = nullptr;
+    try {//in case CreateCommand will failed
+        cmd=smash.CreateCommand(cmd_left_line.c_str());
+    }
+    catch(Continue& e){
+        do_close(outfd);
+        throw;
+    }
     auto external= dynamic_cast<ExternalCommand*>(cmd);
     if(external)
         execute_external();
     else
         execute_built_in();
     delete cmd;
+
+
 }
 
 void RedirectionCommand::execute_external() {
     auto &smash = SmallShell::getInstance();
-    unsigned int dest_flags = 0;
-    if (IO_type == ">")
-        dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
-    else if (IO_type == ">>")
-        dest_flags = O_CREAT | O_RDWR | O_APPEND;
-    int outfd = do_open(output_file.c_str(), dest_flags);
     pid_t child_pid = do_fork();
     if (child_pid == 0) {
         do_dup2(outfd, STDOUT_FILENO);
@@ -809,12 +834,6 @@ void RedirectionCommand::execute_external() {
 
 void RedirectionCommand::execute_built_in() {
     auto &smash = SmallShell::getInstance();
-    unsigned int dest_flags = 0;
-    if (IO_type == ">")
-        dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
-    else if (IO_type == ">>")
-        dest_flags = O_CREAT | O_RDWR | O_APPEND;
-    int outfd = do_open(output_file.c_str(), dest_flags);
     int temp_stdout=4;
     do_dup2(STDOUT_FILENO, temp_stdout);
     do_dup2(outfd, STDOUT_FILENO);
@@ -822,6 +841,7 @@ void RedirectionCommand::execute_built_in() {
     cmd_left->execute();
     smash.replace_fg_and_wait(JobEntry(this));
     do_dup2(temp_stdout, STDOUT_FILENO);
+    do_close(outfd);
 }
 
 

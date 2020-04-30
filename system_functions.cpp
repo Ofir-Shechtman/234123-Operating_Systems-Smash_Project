@@ -27,7 +27,7 @@ int do_open(const char *file, unsigned int flags) {
     mode_t perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; /*rw-rw-rw-*/
     int fd=open(file, flags, perms);
     if(fd == -1) {
-        do_perror("copy");
+        do_perror("open");
         throw Continue();
     }
     return fd;

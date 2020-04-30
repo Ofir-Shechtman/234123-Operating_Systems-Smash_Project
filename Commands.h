@@ -82,8 +82,8 @@ public:
 
 class RedirectionCommand : public Command {
     string cmd_left_line;
-    string output_file;
     string IO_type;
+    int outfd;
  public:
   explicit RedirectionCommand(const char* cmd_line, const string&  IO_type);
   ~RedirectionCommand() override= default;
