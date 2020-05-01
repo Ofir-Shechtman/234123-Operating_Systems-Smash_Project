@@ -370,10 +370,13 @@ int JobEntry::Kill(int signal) {
 
 bool JobEntry::is_finish() {
     if (!isDead) {
-        pid_t res = do_waitpid(pid, WNOHANG);
-        isDead = res == pid;// || res == -1;
-        if(res==-1)
-            isDead= do_kill(pid, 0)==-1 && errno==ESRCH;
+        //pid_t res = do_waitpid(pid, WNOHANG);
+        //isDead = res == pid;// || res == -1;
+        //if(res==-1){
+        int k=killpg(pid, 0);
+            isDead= k==-1 && errno==ESRCH;
+        //}
+
     }
     return isDead;
 }
@@ -635,11 +638,11 @@ void BackgroundCommand::execute() {
             throw BGInvalidArgs();
         }
     }
-    if(job_id && *job_id<1)
-        throw BGInvalidArgs();
+    //if(job_id && *job_id<1)
+    //    throw BGInvalidArgs();
     auto job = smash.jobs_list.getLastStoppedJob();
-    if (args.size() == 1) {
-        if (job == nullptr) throw BGNoStoppedJobs();
+    if (args.size() == 1 && !job) {
+        throw BGNoStoppedJobs();
     }
     if (args.size() == 2) {
         job = smash.jobs_list.getJobByJobID(*job_id);
