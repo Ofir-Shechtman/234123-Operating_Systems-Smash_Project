@@ -88,7 +88,11 @@ void do_execvp(const char* cmd) {
 }
 
 int do_kill(pid_t pid, int signal) {
-    int res=killpg(pid, signal);
+    int res=0;
+    try {
+        res = killpg(pid, signal);
+    }
+    catch(...){}
     if(res!=0) {
         do_perror("kill");
         throw Continue();

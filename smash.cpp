@@ -45,6 +45,7 @@ int main(int argc, char *argv[]) {
             }
             break;
         }
+        catch(...){}
     }
     return 0;
 }

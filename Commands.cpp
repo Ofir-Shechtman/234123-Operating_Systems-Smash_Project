@@ -499,7 +499,7 @@ void JobsList::removeTimeoutJobs() {
     removeFinishedJobs();
 
     JobEntry &fg_job = SmallShell::getInstance().fg_job;
-    if (fg_job.cmd && fg_job.timer && fg_job.run_time() >= fg_job.timer &&
+    if (fg_job.pid && fg_job.timer && fg_job.run_time() >= fg_job.timer &&
         !fg_job.is_finish()) {
         fg_job.timeout();
         fg_job = JobEntry();
@@ -692,7 +692,7 @@ void CopyCommand::execute() {
         copy(args[1].c_str(), args[2].c_str());
         throw Quit();
     } else {
-        cout << "smash: "<<args[1]<<" was copied to " << args[1] << endl;
+        cout << "smash: "<<args[1]<<" was copied to " << args[2] << endl;
         if (bg)
             SmallShell::getInstance().jobs_list.addJob(
                     JobEntry(this, child_pid));
