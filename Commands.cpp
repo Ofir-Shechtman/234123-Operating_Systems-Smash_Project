@@ -370,12 +370,12 @@ int JobEntry::Kill(int signal) {
 
 bool JobEntry::is_finish() {
     if (!isDead) {
-        //pid_t res = do_waitpid(pid, WNOHANG);
-        //isDead = res == pid;// || res == -1;
-        //if(res==-1){
+        pid_t res = do_waitpid(pid, WNOHANG);
+        isDead = res == pid || res == -1;
+        if(res==-1){
         int k=killpg(pid, 0);
             isDead= k==-1 && errno==ESRCH;
-        //}
+        }
 
     }
     return isDead;
@@ -497,11 +497,10 @@ void JobsList::removeTimeoutJobs() {
             job.timeout();
     }
     removeFinishedJobs();
-
-    JobEntry &fg_job = SmallShell::getInstance().fg_job;
-    if (fg_job.pid && fg_job.timer && fg_job.run_time() >= fg_job.timer &&
-        !fg_job.is_finish()) {
-        fg_job.timeout();
+    auto &smash = SmallShell::getInstance();
+    JobEntry &fg_job = smash.fg_job;
+    if (fg_job.pid && fg_job.timer && fg_job.run_time() >= fg_job.timer){
+        if(!fg_job.is_finish()) fg_job.timeout();
         fg_job = JobEntry();
     }
 }
@@ -510,7 +509,7 @@ void JobsList::removeTimeoutJobs() {
 void JobsList::reset_timer(int new_timer) {
     int timer = 0;
     for (auto &job : list) {
-        if (job.timer && (!timer || job.time_left() < timer)) {
+        if (job.timer && job.time_left() > 0 &&(!timer || job.time_left() < timer)) {
             timer = job.time_left();
         }
     }
@@ -520,9 +519,9 @@ void JobsList::reset_timer(int new_timer) {
 
     if (new_timer && (!timer || new_timer < timer))
         timer = new_timer;
-    if (timer)
+    if (timer){
         alarm(timer);
-
+    }
 }
 
 
