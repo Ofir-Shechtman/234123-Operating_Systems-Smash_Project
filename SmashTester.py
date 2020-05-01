@@ -12,11 +12,11 @@ from os import path, strerror
 from functools import wraps
 import signal
 
-RED =   "\x1b[1;31m"
+RED = "\x1b[1;31m"
 GREEN = "\x1b[1;32m"
-CYAN =  "\x1b[1;36m"
-WHITE =  "\x1b[0;37m"
-RETURN ="\x1b[0m"
+CYAN = "\x1b[1;36m"
+WHITE = "\x1b[0;37m"
+RETURN = "\x1b[0m"
 
 
 def add_color(text, color):
@@ -167,6 +167,7 @@ class SmashRunner:
             if out == '' and self.shell_process.poll() is not None:
                 return
 
+    @timeout(5)
     def read_and_wait(self):
         while self.last != self.NEXT:
             self.read()
@@ -174,21 +175,26 @@ class SmashRunner:
 
     def run(self):
         lines = self.test_file.read().splitlines()
+        empty_signal = False
         for i, line in enumerate(lines):
             if line.startswith("#"):
                 continue
             if line.startswith("!"):
                 exec(line[1:])
+                self.out_file.write(line+'\n')
                 continue
-            elif line not in ["Ctrl-Z", "Ctrl-C", "CtrlZ", "CtrlC"]:
-                self.read()#_and_wait()
+            elif line not in ["Ctrl-Z", "Ctrl-C", "CtrlZ", "CtrlC"] and not empty_signal:
+                self.read_and_wait()
             else:
                 self.read()
+                empty_signal = False
             if line.startswith(("Ctrl-Z", "CtrlZ")):
                 self.signal(SIGTSTP)
+                empty_signal = True
                 continue
             elif line.startswith(("Ctrl-C", "CtrlC")):
                 self.signal(SIGINT)
+                empty_signal = True
                 continue
             else:
 
@@ -218,7 +224,8 @@ class SmashTester:
                     PidChanger(self.output + "{}.out".format(i)).pid_reset()
         else:
             if self.output:
-                smash = SmashRunner(self.executable, self.tests[0], self.next, self.color, self.valgrind, self.output + ".out")
+                smash = SmashRunner(self.executable, self.tests[0], self.next, self.color, self.valgrind,
+                                    self.output + ".out")
             else:
                 smash = SmashRunner(self.executable, self.tests[0], self.next, self.color, self.valgrind)
             smash.run()

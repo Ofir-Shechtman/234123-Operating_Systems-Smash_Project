@@ -370,12 +370,12 @@ int JobEntry::Kill(int signal) {
 
 bool JobEntry::is_finish() {
     if (!isDead) {
-        pid_t res = do_waitpid(pid, WNOHANG);
-        isDead = res == pid || res == -1;
-        if(res==-1){
+        //pid_t res = do_waitpid(pid, WNOHANG);
+        //isDead = res == pid;// || res == -1;
+        //if(res==-1){
         int k=killpg(pid, 0);
             isDead= k==-1 && errno==ESRCH;
-        }
+        //}
 
     }
     return isDead;
@@ -389,6 +389,7 @@ void JobEntry::timeout() {
 
 
 void JobsList::addJob(JobEntry job) {
+    usleep(1);
     removeFinishedJobs();
     job.job_id = allocJobId();
     list.push_back(job);
@@ -507,6 +508,7 @@ void JobsList::removeTimeoutJobs() {
 
 
 void JobsList::reset_timer(int new_timer) {
+    removeFinishedJobs();
     int timer = 0;
     for (auto &job : list) {
         if (job.timer && job.time_left() > 0 &&(!timer || job.time_left() < timer)) {
@@ -654,9 +656,20 @@ void BackgroundCommand::execute() {
 }
 
 void CopyCommand::copy(const char *infile, const char *outfile) {
+    char *real_infile= nullptr, *real_outfile= nullptr;
+    //cout<<"infile: "<<infile<<" outfile: "<<outfile<<endl;
+    real_infile = realpath(infile, nullptr);
+    real_outfile = realpath(outfile, nullptr);
+    //bool missing=real_infile==nullptr;
+    //cout<<"infile: "<<(real_infile ? real_infile : infile)<<" outfile: "<<(real_outfile ? real_outfile : outfile)<<endl;
+    bool equal=string(real_infile ? real_infile : infile)==string(real_outfile ? real_outfile : outfile);
+    //cout<<"missing: "<<missing<<"equal: "<<equal<<endl;
+    free(real_infile);
+    free(real_outfile);
+    //if(missing)
+    //    return;
 
-    if(string(infile)==string(outfile))
-        return;
+    //cout<<"OPEN"<<endl;
     const int BUFSIZE = 4096;
     int infd, outfd;
     int n;
@@ -665,16 +678,24 @@ void CopyCommand::copy(const char *infile, const char *outfile) {
     int src_flags = O_RDONLY;
     int dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
 
-    infd = do_open(infile, src_flags);
-    outfd = do_open(outfile, dest_flags);
+    try {
+        //cout<<"ddf"<<endl;
+        infd = do_open(infile, src_flags);
+        if(!equal) {
+            outfd = do_open(outfile, dest_flags);
 
-    while ((n = do_read(infd, buf, BUFSIZE)) > 0)
-        do_write(outfd, buf, n);
-
-    do_close(infd);
-    do_close(outfd);
-
-
+            while ((n = do_read(infd, buf, BUFSIZE)) > 0)
+                do_write(outfd, buf, n);
+            do_close(outfd);
+        }
+        do_close(infd);
+        cout << "smash: "<<infile<<" was copied to " <<outfile << endl;
+    }
+    catch(...){
+        do_close(infd);
+        do_close(outfd);
+        return;
+    }
 }
 
 CopyCommand::CopyCommand(const char *cmd_line, vector<string> &args) :
@@ -691,7 +712,6 @@ void CopyCommand::execute() {
         copy(args[1].c_str(), args[2].c_str());
         throw Quit();
     } else {
-        cout << "smash: "<<args[1]<<" was copied to " << args[2] << endl;
         if (bg)
             SmallShell::getInstance().jobs_list.addJob(
                     JobEntry(this, child_pid));
