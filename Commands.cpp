@@ -371,7 +371,9 @@ int JobEntry::Kill(int signal) {
 bool JobEntry::is_finish() {
     if (!isDead) {
         pid_t res = do_waitpid(pid, WNOHANG);
-        isDead = res == pid || res == -1;
+        isDead = res == pid;// || res == -1;
+        if(res==-1)
+            isDead= do_kill(pid, 0)==-1 && errno==ESRCH;
     }
     return isDead;
 }
@@ -586,8 +588,7 @@ ForegroundCommand::FGJobIDDoesntExist::FGJobIDDoesntExist(JobId job_id)
 void ForegroundCommand::execute() {
     auto &smash = SmallShell::getInstance();
     smash.jobs_list.removeFinishedJobs();
-    if (smash.jobs_list.empty())
-        throw FGEmptyJobsList();
+
     if (args.size() != 2 && args.size() != 1) throw FGInvalidArgs();
     JobId *job_id = nullptr;
     if (args.size() == 2) {
@@ -599,8 +600,10 @@ void ForegroundCommand::execute() {
             throw FGInvalidArgs();
         }
     }
-    if(job_id && *job_id<1)
-        throw FGInvalidArgs();
+    //if(job_id && *job_id<1)
+    //    throw FGInvalidArgs();
+    if (!job_id && smash.jobs_list.empty())
+        throw FGEmptyJobsList();
     auto job = smash.jobs_list.getLastJob(job_id);
     if (job == nullptr) throw FGJobIDDoesntExist(*job_id);
     job->Kill(SIGCONT);

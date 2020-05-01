@@ -52,13 +52,17 @@ int do_write(int df, char *buffer, int n) {
 
 
 int do_fork() {
+    pid_t smash_pid= SmallShell::getInstance().pid;
+    bool is_smash=smash_pid==getpid();
     int child = fork();
     if(child<0) {
         do_perror("fork");
         throw Continue();
     }
-    else if(child==0 && is_smash())
+    else if(child==0 && is_smash) {
         setpgrp();
+    }
+
     return child;
 }
 
@@ -88,10 +92,11 @@ void do_execvp(const char* cmd) {
 int do_kill(pid_t pid, int signal) {
     int res=0;
     if(is_smash())
-        res=kill(pid, signal);
-    else
         res=killpg(pid, signal);
-    if(res!=0) {
+    else {
+        res = kill(pid, signal);
+    }
+    if(res!=0 and signal) {
         do_perror("kill");
         throw Continue();
     }
@@ -103,10 +108,10 @@ void do_chdir(const char *path) {
         do_perror("chdir");
         throw Continue();
     }
-
 }
 
 pid_t  do_waitpid(pid_t pid, int options){
+    if(pid==getpgrp()) return pid;
     pid_t ret_pid=0;
     int status;
     if(pid)
