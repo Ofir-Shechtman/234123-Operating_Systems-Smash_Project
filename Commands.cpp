@@ -679,7 +679,7 @@ void CopyCommand::copy(const char *infile, const char *outfile) {
     int dest_flags = O_CREAT | O_WRONLY | O_TRUNC;
 
     try {
-        //cout<<"ddf"<<endl;
+        //cout<<"ddf"<<endl;mash error: bg: invalid arguments
         infd = do_open(infile, src_flags);
         if(!equal) {
             outfd = do_open(outfile, dest_flags);
