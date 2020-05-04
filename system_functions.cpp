@@ -53,14 +53,21 @@ int do_write(int df, char *buffer, int n) {
 
 int do_fork() {
     //pid_t smash_pid= SmallShell::getInstance().pid;
-    bool smash_f=is_smash();
+    bool im_smash=is_smash();
     int child = fork();
     if(child<0) {
         do_perror("fork");
         throw Continue();
     }
-    else if(child==0 && smash_f)
-        setpgrp();
+    else if(child==0) {
+        if(im_smash)
+            setpgrp();
+        raise(SIGSTOP); // stop the child
+    }
+    else {
+        waitpid(child, NULL, WUNTRACED); // wait until the child is stopped
+        kill(child, SIGCONT); // resume the child
+    }
     return child;
 }
 
@@ -111,7 +118,7 @@ pid_t  do_waitpid(pid_t pid, int options){
             ret_pid = waitpid(pid, &status, options);
         }
         while
-        (!is_smash() && (WIFSTOPPED(status) || WIFCONTINUED(status)) && options==WUNTRACED);
+        (!is_smash() && (WIFSTOPPED(status)) && options==WUNTRACED);
     return ret_pid;
 }
 

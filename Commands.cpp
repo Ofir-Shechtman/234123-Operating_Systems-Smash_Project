@@ -256,12 +256,10 @@ pid_t SmallShell::get_pid() {
 }
 
 void SmallShell::replace_fg_and_wait(JobEntry job) {
-    auto &shell_fg_job = fg_job;
-    delete shell_fg_job.cmd;
-    shell_fg_job = JobEntry(job);
-    do_waitpid(shell_fg_job.pid, WUNTRACED);
-    shell_fg_job.pid = 0;
-
+    delete fg_job.cmd;
+    fg_job = job;
+    do_waitpid(fg_job.pid, WUNTRACED);
+    fg_job.pid = 0;
 }
 
 
@@ -295,6 +293,7 @@ void ExternalCommand::execute() {
     const string cmd_line_no_bg = _remove_bg_sign(cmd_line);
     pid_t child_pid = do_fork();
     if (child_pid == 0) {
+        //cout<<"command "<<getpid()<<" start running"<<endl;
         do_execvp(cmd_line_no_bg.c_str());
     } else {
         if (bg)
@@ -365,16 +364,18 @@ int JobEntry::Kill(int signal) {
         smash.jobs_list.removeFromStopped(job_id);
     }
     int res = do_kill(pid, signal);
+
     return res;
 }
 
 bool JobEntry::is_finish() {
+    //cout<<"is finish "<<pid<<endl;
     if (!isDead) {
         //pid_t res = do_waitpid(pid, WNOHANG);
-        //isDead = res == pid;// || res == -1;
-        //if(res==-1){
-        int k=killpg(pid, 0);
-            isDead= k==-1 && errno==ESRCH;
+        //cout<<"waitpid "<<res<<(errno==ECHILD)<<endl;
+        //isDead = res == pid || (res == -1 &&errno==ECHILD);
+        //if(res==-1 && errno==ECHILD){
+            isDead= killpg(pid, 0)==-1 && errno==ESRCH;
         //}
 
     }
@@ -389,7 +390,9 @@ void JobEntry::timeout() {
 
 
 void JobsList::addJob(JobEntry job) {
-    usleep(1);
+    //usleep(10);//racing between smash and child proc
+    //sched_yield();
+    //cout<<do_waitpid(job.pid, WNOHANG)<<endl;
     removeFinishedJobs();
     job.job_id = allocJobId();
     list.push_back(job);
@@ -652,6 +655,10 @@ void BackgroundCommand::execute() {
     }
     cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
     job->Kill(SIGCONT);
+    int status = 0;
+    do {
+        waitpid(job->pid, &status, WCONTINUED);
+    }while(!WIFCONTINUED(status));
     smash.replace_fg_and_wait(JobEntry(this));
 }
 
@@ -732,14 +739,14 @@ KillCommand::KillCommand(const char *cmdLine1, vector<string> &args)
     catch (std::invalid_argument const &e) {
         throw KillInvalidArgs();
     }
-    if (sig_num < 1 || sig_num > 31 || job_id<1)
-        throw KillInvalidArgs();
 }
 
 void KillCommand::execute() {
     SmallShell &smash = SmallShell::getInstance();
     auto job = smash.jobs_list.getJobByJobID(job_id);
     if (job == nullptr) throw KillJobIDDoesntExist(job_id);
+    //if (sig_num < 1 || sig_num > 31 || job_id<1)
+    //    throw KillInvalidArgs();
     if (job->Kill(sig_num) == 0)
         cout << "signal number " << sig_num << " was sent to pid " << job->pid
              << endl;
@@ -788,8 +795,8 @@ void PipeCommand::execute() {
         }
         do_close(pipefd[0]);
         do_close(pipefd[1]);
-        do_waitpid(child_pid1, WUNTRACED);
-        do_waitpid(child_pid2, WUNTRACED);
+        do_waitpid(child_pid1, 0);
+        do_waitpid(child_pid2, 0);
         throw Quit();
     }
 

@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
             break;
         }
         catch (Quit &) {
-            break;
+            return 0;
         }
         catch(std::bad_alloc& e) {
             if (smash.is_smash()){
@@ -49,5 +49,4 @@ int main(int argc, char *argv[]) {
         }
         catch(...){}
     }
-    return 0;
 }
