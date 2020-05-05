@@ -111,15 +111,9 @@ void do_chdir(const char *path) {
 }
 
 pid_t  do_waitpid(pid_t pid, int options){
-    pid_t ret_pid=0;
-    int status;
-    if(pid)
-        do {
-            ret_pid = waitpid(pid, &status, options);
-        }
-        while
-        (!is_smash() && (WIFSTOPPED(status)) && options==WUNTRACED);
-    return ret_pid;
+    if(!pid)
+        return pid;
+    return waitpid(pid, nullptr, options);;
 }
 
 int do_stoi(std::string num) {

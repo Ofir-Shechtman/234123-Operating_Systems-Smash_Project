@@ -655,10 +655,10 @@ void BackgroundCommand::execute() {
     }
     cout << job->cmd->get_cmd_line() << " : " << job->pid << endl;
     job->Kill(SIGCONT);
-    int status = 0;
+    /*int status = 0;
     do {
         waitpid(job->pid, &status, WCONTINUED);
-    }while(!WIFCONTINUED(status));
+    }while(!WIFCONTINUED(status));*/
     smash.replace_fg_and_wait(JobEntry(this));
 }
 
@@ -795,8 +795,8 @@ void PipeCommand::execute() {
         }
         do_close(pipefd[0]);
         do_close(pipefd[1]);
-        do_waitpid(child_pid1, 0);
-        do_waitpid(child_pid2, 0);
+        do_waitpid(child_pid1);
+        do_waitpid(child_pid2);
         throw Quit();
     }
 
